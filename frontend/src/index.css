@@ -1,0 +1,159 @@
+@import "@fontsource-variable/manrope";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 150 24% 97%;
+    --foreground: 165 44% 8%;
+    --card: 0 0% 100%;
+    --card-foreground: 165 44% 8%;
+    --primary: 162 69% 26%;
+    --primary-foreground: 150 45% 98%;
+    --secondary: 150 16% 93%;
+    --secondary-foreground: 165 28% 16%;
+    --muted: 150 16% 94%;
+    --muted-foreground: 160 8% 43%;
+    --accent: 156 24% 94%;
+    --accent-foreground: 165 32% 13%;
+    --destructive: 352 68% 49%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 152 14% 88%;
+    --input: 152 13% 84%;
+    --ring: 162 68% 32%;
+    --sidebar: 166 56% 6%;
+    --sidebar-foreground: 150 24% 96%;
+    --sidebar-muted: 160 10% 63%;
+    --sidebar-accent: 163 35% 13%;
+    --radius: 0.75rem;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: "Manrope Variable", "Manrope", ui-sans-serif, system-ui, sans-serif;
+    font-feature-settings: "ss01" on, "cv11" on;
+    min-width: 320px;
+  }
+
+  ::selection {
+    background: rgb(16 185 129 / 0.22);
+  }
+
+  :focus-visible {
+    outline: none;
+  }
+
+  input[type="date"],
+  input[type="time"],
+  input[type="month"] {
+    color-scheme: light;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply rounded-full border-4 border-solid border-transparent bg-slate-300/80 bg-clip-content;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-slate-400/80;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .text-pretty {
+    text-wrap: pretty;
+  }
+
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .page-container {
+    @apply mx-auto w-full max-w-[1440px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8;
+  }
+
+  .surface-grid {
+    background-image:
+      linear-gradient(to right, rgb(6 78 59 / 0.045) 1px, transparent 1px),
+      linear-gradient(to bottom, rgb(6 78 59 / 0.045) 1px, transparent 1px);
+    background-size: 42px 42px;
+  }
+
+  .noise::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.022;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  .glass {
+    background: rgb(255 255 255 / 0.82);
+    backdrop-filter: blur(14px);
+  }
+
+  .balance {
+    text-wrap: balance;
+  }
+
+  .scrollbar-none {
+    scrollbar-width: none;
+  }
+
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+.recharts-cartesian-axis-tick-value {
+  font-size: 11px;
+  fill: hsl(var(--muted-foreground));
+}
+
+.recharts-tooltip-wrapper {
+  outline: none;
+}
+
+.sonner-toast {
+  font-family: inherit !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
