@@ -102,11 +102,7 @@ def period_query(start: date | None, end: date | None, today: date | None = None
     return start, end
 
 
-def previous_period(start: date, end: date) -> tuple[date, date]:
-    length = (end - start).days + 1
-    prev_end = start - timedelta(days=1)
-    prev_start = prev_end - timedelta(days=length - 1)
-    return prev_start, prev_end
+previous_period = finance.previous_period
 
 
 def trend_points(txns: Sequence[Transaction], start: date, end: date) -> list[TrendPoint]:

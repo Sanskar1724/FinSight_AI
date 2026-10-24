@@ -60,10 +60,37 @@ def test_percentage_change_is_not_comparable_for_zero_baseline() -> None:
     assert percentage_change(Decimal("100"), None) is None
 
 
-def test_previous_period_has_equal_length() -> None:
-    start, end = previous_period(date(2026, 10, 1), date(2026, 10, 23))
-    assert end == date(2026, 9, 30)
-    assert (end - start).days == 22
+def test_previous_period_aligns_month_to_date_ranges() -> None:
+    assert previous_period(date(2026, 10, 1), date(2026, 10, 23)) == (
+        date(2026, 9, 1),
+        date(2026, 9, 23),
+    )
+    # Day 31 has no September equivalent, so it clamps to the month end.
+    assert previous_period(date(2026, 10, 1), date(2026, 10, 31)) == (
+        date(2026, 9, 1),
+        date(2026, 9, 30),
+    )
+    assert previous_period(date(2026, 3, 1), date(2026, 3, 30)) == (
+        date(2026, 2, 1),
+        date(2026, 2, 28),
+    )
+
+
+def test_previous_period_compares_whole_months_with_whole_months() -> None:
+    assert previous_period(date(2026, 2, 1), date(2026, 2, 28)) == (
+        date(2026, 1, 1),
+        date(2026, 1, 31),
+    )
+    assert previous_period(date(2026, 5, 1), date(2026, 10, 24)) == (
+        date(2025, 11, 1),
+        date(2026, 4, 24),
+    )
+
+
+def test_previous_period_uses_equal_length_window_for_arbitrary_ranges() -> None:
+    start, end = previous_period(date(2026, 10, 10), date(2026, 10, 23))
+    assert end == date(2026, 10, 9)
+    assert (end - start).days == 13
 
 
 def test_inr_uses_indian_grouping() -> None:

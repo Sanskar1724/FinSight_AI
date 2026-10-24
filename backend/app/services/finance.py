@@ -73,7 +73,23 @@ def percentage_change(current: Decimal, baseline: Decimal | None) -> float | Non
 
 
 def previous_period(start: date, end: date) -> tuple[date, date]:
-    """Immediately preceding period of the same inclusive length."""
+    """Comparable earlier period for ``start``..``end`` (inclusive).
+
+    Ranges that begin on the first of a month are compared with the same span
+    of the preceding month(s): 1-23 Oct compares with 1-23 Sep, and a range
+    ending on a month end compares with whole months. This keeps paydays and
+    rent, which cluster at the start of a month, in both periods. Any other
+    range is compared with the immediately preceding window of equal length.
+    """
+    if start.day == 1:
+        span = (end.year - start.year) * 12 + end.month - start.month + 1
+        previous_start = add_months(start, -span)
+        end_month_start, end_month_last = month_bounds(add_months(end, -span))
+        if end == month_bounds(end)[1]:
+            previous_end = end_month_last
+        else:
+            previous_end = end_month_start.replace(day=min(end.day, end_month_last.day))
+        return previous_start, previous_end
     length = (end - start).days + 1
     previous_end = start - timedelta(days=1)
     return previous_end - timedelta(days=length - 1), previous_end
