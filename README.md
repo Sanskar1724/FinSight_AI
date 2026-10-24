@@ -204,6 +204,12 @@ cd ../backend && python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
 
 Then open <http://127.0.0.1:8000>. For PostgreSQL, HTTPS cookies, CORS, and separate static hosting, see the [deployment guide](docs/DEPLOYMENT.md).
 
+### Deploy it free
+
+The repository ships a production [`Dockerfile`](Dockerfile) and a Render Blueprint ([`render.yaml`](render.yaml)). With free Render, Neon (PostgreSQL), and Brevo (email) accounts, the app goes live on a `*.onrender.com` HTTPS subdomain in about 30 minutes. See the step-by-step guide: [Go live for free](docs/DEPLOYMENT.md#go-live-for-free-render--neon--brevo--uptimerobot).
+
+Built in for real users: password reset by email, change password, account deletion, a Privacy Policy and Terms with consent at sign-up, a nightly demo reset, production secret checks, and hidden API docs.
+
 ## How it works
 
 ```mermaid
