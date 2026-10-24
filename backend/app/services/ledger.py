@@ -207,63 +207,87 @@ def category_breakdown(txns: Sequence[Transaction]) -> list[CategorySpend]:
     return result
 
 
+BUDGET_HISTORY_MONTHS = 3
+
+
+def category_month_spend(
+    db: Session,
+    user_id: int,
+    category_ids: Sequence[int],
+    first_month: date,
+    last_month: date,
+) -> dict[tuple[int, date], Decimal]:
+    """Expense totals keyed by (category_id, first day of month), in one query."""
+    totals: dict[tuple[int, date], Decimal] = defaultdict(lambda: ZERO)
+    if not category_ids:
+        return totals
+    _, end = finance.month_bounds(last_month)
+    rows = db.execute(
+        select(Transaction.category_id, Transaction.occurred_on, Transaction.amount).where(
+            Transaction.user_id == user_id,
+            Transaction.type == "expense",
+            Transaction.category_id.in_(set(category_ids)),
+            Transaction.occurred_on >= date(first_month.year, first_month.month, 1),
+            Transaction.occurred_on <= end,
+        )
+    ).all()
+    for category_id, occurred_on, amount in rows:
+        totals[(category_id, date(occurred_on.year, occurred_on.month, 1))] += dec(amount)
+    return totals
+
+
+def _spend_window(db: Session, user_id: int, budgets: Sequence[Budget]) -> dict[tuple[int, date], Decimal]:
+    if not budgets:
+        return {}
+    months = [budget.month for budget in budgets]
+    return category_month_spend(
+        db,
+        user_id,
+        [budget.category_id for budget in budgets],
+        finance.add_months(min(months), -BUDGET_HISTORY_MONTHS),
+        max(months),
+    )
+
+
 def budget_history(
-    db: Session, user_id: int, category_id: int, budget_month: date, months: int = 3
+    spend: dict[tuple[int, date], Decimal],
+    category_id: int,
+    budget_month: date,
+    months: int = BUDGET_HISTORY_MONTHS,
 ) -> list[Decimal]:
     history = []
     for offset in range(1, months + 1):
-        month = finance.add_months(budget_month, -offset)
-        start, end = finance.month_bounds(month)
-        if end >= budget_month:
-            continue
-        total = db.scalar(
-            select(func.coalesce(func.sum(Transaction.amount), 0)).where(
-                Transaction.user_id == user_id,
-                Transaction.category_id == category_id,
-                Transaction.type == "expense",
-                Transaction.occurred_on >= start,
-                Transaction.occurred_on <= end,
-            )
-        )
-        value = dec(total)
+        value = spend.get((category_id, finance.add_months(budget_month, -offset)), ZERO)
         if value > 0:
             history.append(value)
     return history
 
 
 def build_budget_out(
-    db: Session, budget: Budget, today: date | None = None
+    db: Session,
+    budget: Budget,
+    today: date | None = None,
+    spend: dict[tuple[int, date], Decimal] | None = None,
 ) -> BudgetOut:
+    """Build the API view of a budget.
+
+    ``spend`` lets callers share one pre-aggregated query across many budgets
+    (see ``budgets_for_month``); it is loaded on demand for a single budget.
+    """
     today = today or date.today()
-    start, end = finance.month_bounds(budget.month)
-    spent = db.scalar(
-        select(func.coalesce(func.sum(Transaction.amount), 0)).where(
-            Transaction.user_id == budget.user_id,
-            Transaction.category_id == budget.category_id,
-            Transaction.type == "expense",
-            Transaction.occurred_on >= start,
-            Transaction.occurred_on <= end,
-        )
-    )
-    spent_dec = dec(spent)
+    if spend is None:
+        spend = _spend_window(db, budget.user_id, [budget])
+    spent_dec = q(spend.get((budget.category_id, budget.month), ZERO))
     limit_dec = dec(budget.limit_amount)
     utilization = float(q(spent_dec / limit_dec * 100)) if limit_dec > 0 else 0.0
     status, threshold = finance.budget_status(
         utilization, budget.warning_threshold, budget.critical_threshold
     )
-    history = budget_history(db, budget.user_id, budget.category_id, budget.month)
+    history = budget_history(spend, budget.category_id, budget.month)
     risk = finance.budget_risk(spent_dec, limit_dec, budget.month, today, history)
-    previous_start, previous_end = finance.month_bounds(finance.add_months(budget.month, -1))
-    previous = db.scalar(
-        select(func.coalesce(func.sum(Transaction.amount), 0)).where(
-            Transaction.user_id == budget.user_id,
-            Transaction.category_id == budget.category_id,
-            Transaction.type == "expense",
-            Transaction.occurred_on >= previous_start,
-            Transaction.occurred_on <= previous_end,
-        )
+    previous_dec = q(
+        spend.get((budget.category_id, finance.add_months(budget.month, -1)), ZERO)
     )
-    previous_dec = dec(previous)
     change = finance.percentage_change(spent_dec, previous_dec)
 
     category = budget.category
@@ -307,7 +331,8 @@ def budgets_for_month(db: Session, user_id: int, month: date, today: date | None
             .order_by(Budget.id)
         ).all()
     )
-    return [build_budget_out(db, budget, today) for budget in budgets]
+    spend = _spend_window(db, user_id, budgets)
+    return [build_budget_out(db, budget, today, spend) for budget in budgets]
 
 
 def goal_out(goal: SavingsGoal, today: date | None = None) -> GoalOut:
