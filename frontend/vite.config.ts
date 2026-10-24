@@ -59,6 +59,22 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        // React and the router are needed on every page and change rarely, so
+        // they get a long-lived chunk that survives app deploys in the browser
+        // and service-worker caches. Everything else is left to Rollup so
+        // page-specific libraries (charts, forms) stay lazily loaded.
+        manualChunks(id) {
+          if (/[\\/]node_modules[\\/](react|react-dom|react-router|react-router-dom|scheduler)[\\/]/.test(id)) {
+            return "vendor-react";
+          }
+          return undefined;
+        },
+      },
+    },
+  },
   server: {
     port: 5173,
     proxy: {
