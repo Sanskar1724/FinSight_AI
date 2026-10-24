@@ -43,6 +43,9 @@ class Settings(BaseSettings):
     auto_create_tables: bool = True
     seed_demo_on_startup: bool = True
     enable_scheduler: bool = True
+    # Interactive API docs are on in development and off in production unless
+    # explicitly enabled, so the full API surface is not advertised publicly.
+    enable_api_docs: bool | None = None
     notification_check_minutes: int = 30
     max_upload_bytes: int = 2_000_000
     ai_provider: str = "deterministic"
@@ -73,6 +76,12 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.environment.lower() == "production"
+
+    @property
+    def api_docs_enabled(self) -> bool:
+        if self.enable_api_docs is not None:
+            return self.enable_api_docs
+        return not self.is_production
 
     @property
     def cors_origin_list(self) -> list[str]:

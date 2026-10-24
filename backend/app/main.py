@@ -94,9 +94,9 @@ app = FastAPI(
         "All financial figures are calculated by a deterministic engine. "
         "Demo records are fictional; no bank or UPI connection exists."
     ),
-    docs_url="/api/docs",
-    redoc_url="/api/redoc",
-    openapi_url="/api/openapi.json",
+    docs_url=f"{settings.api_prefix}/docs" if settings.api_docs_enabled else None,
+    redoc_url=f"{settings.api_prefix}/redoc" if settings.api_docs_enabled else None,
+    openapi_url=f"{settings.api_prefix}/openapi.json" if settings.api_docs_enabled else None,
     lifespan=lifespan,
 )
 

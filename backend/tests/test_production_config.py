@@ -27,3 +27,12 @@ def test_development_keeps_the_convenient_default() -> None:
     settings = Settings(_env_file=None, environment="development")
     assert settings.secret_key == DEFAULT_SECRET_KEY
     assert not settings.use_secure_cookies
+
+
+def test_api_docs_default_off_in_production_and_can_be_enabled() -> None:
+    strong = "x" * 48
+    assert Settings(_env_file=None, environment="development").api_docs_enabled
+    assert not Settings(_env_file=None, environment="production", secret_key=strong).api_docs_enabled
+    assert Settings(
+        _env_file=None, environment="production", secret_key=strong, enable_api_docs=True
+    ).api_docs_enabled
