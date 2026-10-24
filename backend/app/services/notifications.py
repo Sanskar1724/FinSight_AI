@@ -139,6 +139,64 @@ def _rate_limited(db: Session, user_id: int, category: str, now: datetime) -> bo
     return int(count or 0) >= MAX_PER_CATEGORY_PER_DAY
 
 
+class _NotificationState:
+    """In-memory snapshot of a user's notifications for one evaluation pass.
+
+    ``evaluate_notifications`` checks dozens of rules; querying for duplicates,
+    rate limits, and stale stages per rule cost one to three queries each.
+    Loading the user's notifications once and keeping the snapshot in sync
+    with every insert and delete makes a full pass a handful of queries.
+    """
+
+    def __init__(self, db: Session, user_id: int, now: datetime) -> None:
+        self.db = db
+        self.since = now - timedelta(days=1)
+        self.rows: list[Notification] = list(
+            db.scalars(select(Notification).where(Notification.user_id == user_id)).all()
+        )
+        self.keys = {row.event_key for row in self.rows}
+
+    def rate_limited(self, category: str) -> bool:
+        recent = sum(
+            1
+            for row in self.rows
+            if row.category == category and row.created_at and row.created_at >= self.since
+        )
+        return recent >= MAX_PER_CATEGORY_PER_DAY
+
+    def add(self, notification: Notification) -> None:
+        self.rows.append(notification)
+        self.keys.add(notification.event_key)
+
+    def delete(
+        self,
+        event_prefixes: Sequence[str],
+        *,
+        category: str | None = None,
+        keep_event_key: str | None = None,
+        exact: bool = False,
+    ) -> int:
+        def matches(key: str) -> bool:
+            if exact:
+                return key in event_prefixes
+            return any(key.startswith(prefix) for prefix in event_prefixes)
+
+        matched = [
+            row
+            for row in self.rows
+            if (category is None or row.category == category)
+            and row.event_key != keep_event_key
+            and matches(row.event_key)
+        ]
+        for row in matched:
+            self.db.delete(row)
+            self.rows.remove(row)
+        self.keys = {row.event_key for row in self.rows}
+        if matched:
+            self.db.flush()
+        return len(matched)
+
+
 def _add_notification(
     db: Session,
     user_id: int,
@@ -155,19 +213,24 @@ def _add_notification(
     action_url: str | None = None,
     local_now: datetime | None = None,
     skip_preference_check: bool = False,
+    state: _NotificationState | None = None,
 ) -> Notification | None:
     if not skip_preference_check and not _configured(notification_type, preference):
         return None
-    existing = db.scalar(
-        select(Notification).where(
-            Notification.user_id == user_id, Notification.event_key == event_key
+    if state is not None:
+        if event_key in state.keys or state.rate_limited(notification_type):
+            return None
+    else:
+        existing = db.scalar(
+            select(Notification).where(
+                Notification.user_id == user_id, Notification.event_key == event_key
+            )
         )
-    )
-    if existing is not None:
-        return None
+        if existing is not None:
+            return None
+        if _rate_limited(db, user_id, notification_type, utcnow()):
+            return None
     local_now = local_now or _local_now()
-    if _rate_limited(db, user_id, notification_type, utcnow()):
-        return None
     scheduled_for = _scheduled_for(
         preference,
         local_now,
@@ -197,6 +260,8 @@ def _add_notification(
             error=None,
         )
     )
+    if state is not None:
+        state.add(notification)
     return notification
 
 
@@ -215,33 +280,6 @@ def _delete_notifications(
             or_(*prefix_conditions),
         )
     ).all()
-    for row in rows:
-        db.delete(row)
-    if rows:
-        db.flush()
-    return len(rows)
-
-
-def _delete_stale_stage(
-    db: Session,
-    user_id: int,
-    *,
-    category: str,
-    event_prefixes: Sequence[str],
-    keep_event_key: str | None,
-) -> int:
-    prefix_conditions = [
-        Notification.event_key.startswith(prefix, autoescape=True)
-        for prefix in event_prefixes
-    ]
-    conditions = [
-        Notification.user_id == user_id,
-        Notification.category == category,
-        or_(*prefix_conditions),
-    ]
-    if keep_event_key is not None:
-        conditions.append(Notification.event_key != keep_event_key)
-    rows = db.scalars(select(Notification).where(*conditions)).all()
     for row in rows:
         db.delete(row)
     if rows:
@@ -270,10 +308,26 @@ def clear_goal_notifications(db: Session, user_id: int, goal_id: int) -> int:
     return _delete_notifications(db, user_id, [f"goal_behind:{goal_id}:"])
 
 
+def _anomaly_key(transaction_id: int) -> str:
+    return f"anomaly:{transaction_id}"
+
+
 def clear_anomaly_notifications(
     db: Session, user_id: int, transaction_id: int
 ) -> int:
-    return _delete_notifications(db, user_id, [f"anomaly:{transaction_id}"])
+    # Anomaly keys have no trailing delimiter, so match exactly: a prefix of
+    # "anomaly:1" would also clear "anomaly:12".
+    rows = db.scalars(
+        select(Notification).where(
+            Notification.user_id == user_id,
+            Notification.event_key == _anomaly_key(transaction_id),
+        )
+    ).all()
+    for row in rows:
+        db.delete(row)
+    if rows:
+        db.flush()
+    return len(rows)
 
 
 def clear_recurring_notifications(
@@ -326,6 +380,7 @@ def evaluate_notifications(
     created = 0
     skipped = 0
     messages: list[str] = []
+    state = _NotificationState(db, user.id, utcnow())
 
     def record(result: Notification | None, label: str) -> None:
         nonlocal created, skipped
@@ -348,11 +403,9 @@ def evaluate_notifications(
             f"budget_exceeded:{budget.id}:{budget.month.isoformat()}",
         ]
         if budget.status == "exceeded":
-            _delete_stale_stage(
-                db,
-                user.id,
+            state.delete(
+                threshold_prefixes,
                 category="budget_threshold",
-                event_prefixes=threshold_prefixes,
                 keep_event_key=exceeded_key,
             )
             record(
@@ -376,15 +429,14 @@ def evaluate_notifications(
                     action_label="Review spending",
                     action_url="/budgets",
                     local_now=local_now,
+                    state=state,
                 ),
                 f"{budget.category.name} exceeded budget",
             )
         elif budget.status == "critical":
-            _delete_stale_stage(
-                db,
-                user.id,
+            state.delete(
+                threshold_prefixes,
                 category="budget_threshold",
-                event_prefixes=threshold_prefixes,
                 keep_event_key=critical_key,
             )
             record(
@@ -413,15 +465,14 @@ def evaluate_notifications(
                     action_label="Review budget",
                     action_url="/budgets",
                     local_now=local_now,
+                    state=state,
                 ),
                 f"{budget.category.name} crossed the critical budget threshold",
             )
         elif budget.status == "approaching":
-            _delete_stale_stage(
-                db,
-                user.id,
+            state.delete(
+                threshold_prefixes,
                 category="budget_threshold",
-                event_prefixes=threshold_prefixes,
                 keep_event_key=warning_key,
             )
             record(
@@ -446,15 +497,14 @@ def evaluate_notifications(
                     action_label="Review budget",
                     action_url="/budgets",
                     local_now=local_now,
+                    state=state,
                 ),
                 f"{budget.category.name} crossed the warning threshold",
             )
         else:
-            _delete_stale_stage(
-                db,
-                user.id,
+            state.delete(
+                threshold_prefixes,
                 category="budget_threshold",
-                event_prefixes=threshold_prefixes,
                 keep_event_key=None,
             )
 
@@ -464,11 +514,9 @@ def evaluate_notifications(
             and budget.risk.risk_level in {"at_risk", "likely_over"}
             and budget.actual_spend < budget.limit_amount
         )
-        _delete_stale_stage(
-            db,
-            user.id,
+        state.delete(
+            [risk_key],
             category="budget_risk",
-            event_prefixes=[risk_key],
             keep_event_key=risk_key if risk_active else None,
         )
         if risk_active:
@@ -494,6 +542,7 @@ def evaluate_notifications(
                     action_label="Run a scenario",
                     action_url="/scenarios",
                     local_now=local_now,
+                    state=state,
                 ),
                 f"{budget.category.name} projected overrun",
             )
@@ -510,7 +559,7 @@ def evaluate_notifications(
     txn_merchants = {txn.id: txn for txn in history_txns}
     for anomaly in anomalies:
         if anomaly.transaction_id in feedback:
-            clear_anomaly_notifications(db, user.id, anomaly.transaction_id)
+            state.delete([_anomaly_key(anomaly.transaction_id)], exact=True)
             continue
         category_name = categories.get(anomaly.category_id)
         record(
@@ -530,11 +579,12 @@ def evaluate_notifications(
                     f"Robust modified z-score {anomaly.score:.1f} exceeded the "
                     f"{anomaly.threshold:.1f} threshold using {anomaly.sample_size} prior transactions."
                 ),
-                event_key=f"anomaly:{anomaly.transaction_id}",
+                event_key=_anomaly_key(anomaly.transaction_id),
                 amount=anomaly.amount,
                 action_label="Review transaction",
                 action_url=f"/transactions?flagged={anomaly.transaction_id}",
                 local_now=local_now,
+                state=state,
             ),
             f"Anomaly at {anomaly.merchant}",
         )
@@ -550,7 +600,7 @@ def evaluate_notifications(
         if candidate.confidence < 0.5:
             continue
         if overrides.get(candidate.merchant_key) in {"confirmed", "dismissed"}:
-            clear_recurring_notifications(db, user.id, candidate.merchant_key)
+            state.delete([f"recurring:{candidate.merchant_key}:"])
             continue
         record(
             _add_notification(
@@ -573,6 +623,7 @@ def evaluate_notifications(
                 action_label="Inspect candidates",
                 action_url="/analytics?tab=patterns",
                 local_now=local_now,
+                state=state,
             ),
             f"Recurring candidate: {candidate.merchant}",
         )
@@ -598,11 +649,9 @@ def evaluate_notifications(
             severity = "warning" if days_left <= 3 else "info"
             stage = severity
         event_key = f"bill:{bill.id}:{bill.due_date.isoformat()}:{stage}"
-        _delete_stale_stage(
-            db,
-            user.id,
+        state.delete(
+            [f"bill:{bill.id}:"],
             category="bill_due",
-            event_prefixes=[f"bill:{bill.id}:"],
             keep_event_key=event_key,
         )
         record(
@@ -620,6 +669,7 @@ def evaluate_notifications(
                 action_label="Manage bills",
                 action_url="/settings?tab=bills",
                 local_now=local_now,
+                state=state,
             ),
             f"Bill reminder: {bill.name}",
         )
@@ -628,20 +678,16 @@ def evaluate_notifications(
     for goal in goals:
         goal_prefix = f"goal_behind:{goal.id}:{current_month.isoformat()}"
         if goal.status not in {"behind", "at_risk"}:
-            _delete_stale_stage(
-                db,
-                user.id,
+            state.delete(
+                [goal_prefix],
                 category="goal_behind",
-                event_prefixes=[goal_prefix],
                 keep_event_key=None,
             )
             continue
         goal_key = f"{goal_prefix}:{goal.status}"
-        _delete_stale_stage(
-            db,
-            user.id,
+        state.delete(
+            [goal_prefix],
             category="goal_behind",
-            event_prefixes=[goal_prefix],
             keep_event_key=goal_key,
         )
         record(
@@ -666,6 +712,7 @@ def evaluate_notifications(
                 action_label="Review goal",
                 action_url="/goals",
                 local_now=local_now,
+                state=state,
             ),
             f"Goal behind: {goal.name}",
         )
@@ -705,6 +752,7 @@ def evaluate_notifications(
                 action_label="Open analytics",
                 action_url="/analytics",
                 local_now=local_now,
+                state=state,
             ),
             "Weekly summary",
         )
@@ -741,6 +789,7 @@ def evaluate_notifications(
                 action_label="Open analytics",
                 action_url="/analytics",
                 local_now=local_now,
+                state=state,
             ),
             "Monthly summary",
         )

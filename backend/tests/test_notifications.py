@@ -262,3 +262,28 @@ def test_quiet_hours_defer_only_non_critical_summaries() -> None:
     assert (
         _scheduled_for(preference, night, notification_type="bill_due", severity="warning") is None
     )
+
+
+def test_clearing_one_anomaly_does_not_clear_ids_sharing_a_prefix(db) -> None:
+    from app.models import Notification, User
+    from app.services.notifications import clear_anomaly_notifications
+
+    user = User(email="prefix@example.com", name="Prefix", password_hash="x")
+    db.add(user)
+    db.flush()
+    for key in ("anomaly:1", "anomaly:12", "anomaly:105"):
+        db.add(
+            Notification(
+                user_id=user.id,
+                category="unusual_spending",
+                title=key,
+                message=key,
+                trigger_reason="test",
+                event_key=key,
+            )
+        )
+    db.flush()
+
+    assert clear_anomaly_notifications(db, user.id, 1) == 1
+    remaining = sorted(n.event_key for n in db.query(Notification).filter_by(user_id=user.id))
+    assert remaining == ["anomaly:105", "anomaly:12"]
