@@ -17,7 +17,7 @@ tested, committed, and pushed separately.
 | --- | --- | --- |
 | 1 | Scenario baseline correctness | Complete |
 | 2 | Authentication and session security | Complete |
-| 3 | Notification lifecycle and links | Planned |
+| 3 | Notification lifecycle and links | Complete |
 | 4 | AI intent, history, and reliability | Planned |
 | 5 | Frontend navigation, state, and accessibility | Planned |
 | 6 | Analytics date scope | Planned |
@@ -131,12 +131,41 @@ user rather than only the current device.
 
 ## Upgrade 3 - Notification lifecycle and links
 
-**Status:** Planned.
+**Status:** Complete.
 
-Planned scope: fix stale or duplicate notifications, broken action links,
-quiet-hours handling for critical alerts, exact threshold boundary behavior,
-and global notification preferences. Tests must cover lifecycle transitions,
-link targets, quiet hours, and exact 100 percent boundaries.
+**Problem:** Budget alerts piled up as spending crossed stages (warning, then
+critical, then exceeded all stayed visible), notifications for paid bills,
+deleted budgets, edited transactions, and reviewed anomalies stayed around,
+several action links pointed to tabs or routes that did not exist, quiet hours
+deferred critical alerts, and alert thresholds came from global preferences
+rather than each budget's own thresholds.
+
+**Implementation:**
+
+- Each budget, bill, and goal keeps one alert per stage. Moving to a new stage
+  replaces the old alert; returning to healthy removes it.
+- Editing or deleting a bill, budget, goal, contribution, or transaction clears
+  its alerts before rules are re-evaluated. Anomaly and recurring feedback
+  clears the matching alerts.
+- Budget alerts use the budget's own thresholds. New budgets inherit the
+  user's preference thresholds when none are supplied.
+- Exactly 100% spend is reported as "limit reached" (critical); "exceeded" is
+  reserved for spend above the limit.
+- Quiet hours defer only weekly and monthly summaries. Critical and time-bound
+  alerts are delivered immediately.
+- Action links target real destinations: `/scenarios`,
+  `/analytics?tab=patterns`, `/settings?tab=bills`, and
+  `/transactions?flagged=<id>`.
+- Analytics and Settings tabs are now driven by `?tab=` (`useTabParam`).
+  Transactions accept `?flagged=` and `?category=` deep links, and CSV export
+  honours the flagged filter.
+- Fixed a corrupted rupee sign in bill reminder messages.
+
+**Verification:**
+
+- `pytest -q`: 63 passed.
+- `npm run typecheck`: passed.
+- `npm run lint`: passed.
 
 ## Upgrade 4 - AI intent, history, and reliability
 

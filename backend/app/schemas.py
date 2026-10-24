@@ -131,8 +131,8 @@ class BudgetCreate(BaseModel):
     category_id: int
     month: date
     limit_amount: Decimal = Field(gt=0, le=Decimal("999999999999.99"))
-    warning_threshold: int = Field(default=70, ge=1, le=99)
-    critical_threshold: int = Field(default=90, ge=2, le=100)
+    warning_threshold: int | None = Field(default=None, ge=1, le=99)
+    critical_threshold: int | None = Field(default=None, ge=2, le=100)
 
     @field_validator("month")
     @classmethod
@@ -141,9 +141,9 @@ class BudgetCreate(BaseModel):
 
     @field_validator("critical_threshold")
     @classmethod
-    def thresholds_ordered(cls, value: int, info: Any) -> int:
-        warning = info.data.get("warning_threshold", 70)
-        if value <= warning:
+    def thresholds_ordered(cls, value: int | None, info: Any) -> int | None:
+        warning = info.data.get("warning_threshold")
+        if value is not None and warning is not None and value <= warning:
             raise ValueError("critical_threshold must be greater than warning_threshold")
         return value
 

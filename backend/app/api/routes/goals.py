@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -20,8 +21,18 @@ from app.schemas import (
 )
 from app.services.finance import q
 from app.services.ledger import goal_out, goals_for_user
+from app.services.notifications import clear_goal_notifications, evaluate_notifications
 
 router = APIRouter(prefix="/goals", tags=["savings goals"])
+logger = logging.getLogger(__name__)
+
+
+def _refresh_notifications(db: Session, user: User) -> None:
+    try:
+        evaluate_notifications(db, user)
+    except Exception:
+        db.rollback()
+        logger.exception("Notification evaluation failed after goal mutation")
 
 
 def _load_goal(db: Session, user_id: int, goal_id: int) -> SavingsGoal:
@@ -70,6 +81,7 @@ def create_goal(
     )
     db.add(goal)
     db.commit()
+    _refresh_notifications(db, user)
     goal = _load_goal(db, user.id, goal.id)
     return goal_out(goal)
 
@@ -92,7 +104,10 @@ def update_goal(
         updates["name"] = name
     for field, value in updates.items():
         setattr(goal, field, value)
+    if updates:
+        clear_goal_notifications(db, user.id, goal.id)
     db.commit()
+    _refresh_notifications(db, user)
     db.refresh(goal)
     return goal_out(goal)
 
@@ -110,6 +125,7 @@ def delete_goal(
     )
     if goal is None:
         raise HTTPException(status_code=404, detail="Savings goal not found")
+    clear_goal_notifications(db, user.id, goal.id)
     db.delete(goal)
     db.commit()
     return MessageResponse(message="Savings goal deleted")
@@ -134,7 +150,9 @@ def add_contribution(
     )
     db.add(contribution)
     goal.updated_at = utcnow()
+    clear_goal_notifications(db, user.id, goal.id)
     db.commit()
+    _refresh_notifications(db, user)
     goal = _load_goal(db, user.id, goal_id)
     return goal_out(goal)
 
@@ -156,7 +174,9 @@ def delete_contribution(
     )
     if contribution is None:
         raise HTTPException(status_code=404, detail="Contribution not found")
+    clear_goal_notifications(db, user.id, goal.id)
     db.delete(contribution)
     db.commit()
+    _refresh_notifications(db, user)
     goal = _load_goal(db, user.id, goal_id)
     return goal_out(goal)

@@ -331,12 +331,17 @@ def test_bills_crud_and_upcoming_reminder(client: TestClient) -> None:
     bill_id = bill.json()["id"]
     assert len(client.get("/api/bills").json()) == 1
 
+    reminders = client.get("/api/notifications", params={"category": "bill_due"}).json()
+    assert reminders["total"] == 1
+    assert reminders["items"][0]["action_url"] == "/settings?tab=bills"
+
     updated = client.patch(f"/api/bills/{bill_id}", json={"is_paid": True})
     assert updated.status_code == 200
     assert updated.json()["is_paid"] is True
 
+    # Paying the bill resolves the reminder rather than leaving it stale.
     notifications = client.get("/api/notifications", params={"category": "bill_due"}).json()
-    assert notifications["total"] >= 1
+    assert notifications["total"] == 0
 
     assert client.delete(f"/api/bills/{bill_id}").status_code == 200
     assert client.get("/api/bills").json() == []

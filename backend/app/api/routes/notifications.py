@@ -101,6 +101,7 @@ def mark_all_read(
             Notification.user_id == user.id,
             Notification.is_read.is_(False),
             Notification.dismissed_at.is_(None),
+            _available_condition(),
         )
     ).all()
     for row in rows:
@@ -159,7 +160,11 @@ def mark_read(
     notification = db.scalar(
         select(Notification)
         .options(selectinload(Notification.deliveries))
-        .where(Notification.id == notification_id, Notification.user_id == user.id)
+        .where(
+            Notification.id == notification_id,
+            Notification.user_id == user.id,
+            _available_condition(),
+        )
     )
     if notification is None:
         raise HTTPException(status_code=404, detail="Notification not found")
@@ -177,7 +182,11 @@ def mark_unread(
     notification = db.scalar(
         select(Notification)
         .options(selectinload(Notification.deliveries))
-        .where(Notification.id == notification_id, Notification.user_id == user.id)
+        .where(
+            Notification.id == notification_id,
+            Notification.user_id == user.id,
+            _available_condition(),
+        )
     )
     if notification is None:
         raise HTTPException(status_code=404, detail="Notification not found")

@@ -44,6 +44,10 @@ from app.services.ledger import (
     txns_between,
     txns_like,
 )
+from app.services.notifications import (
+    clear_anomaly_notifications,
+    clear_recurring_notifications,
+)
 
 router = APIRouter(prefix="/analytics", tags=["analytics"])
 
@@ -272,6 +276,7 @@ def recurring_feedback(
         db.add(override)
     else:
         override.status = payload.status
+    clear_recurring_notifications(db, user.id, merchant_key)
     db.commit()
     return MessageResponse(message=f"Recurring candidate marked {payload.status}")
 
@@ -307,6 +312,7 @@ def anomaly_feedback(
     else:
         feedback.status = payload.status
         feedback.note = payload.note
+    clear_anomaly_notifications(db, user.id, transaction_id)
     db.commit()
     return MessageResponse(message=f"Unusual-spending indicator marked {payload.status}")
 

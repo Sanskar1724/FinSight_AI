@@ -10,7 +10,7 @@ from app.models import Bill, User
 from app.schemas import BillCreate, BillOut, BillUpdate, MessageResponse
 from app.services.finance import q
 from app.services.ledger import dec
-from app.services.notifications import evaluate_notifications
+from app.services.notifications import clear_bill_notifications, evaluate_notifications
 
 router = APIRouter(prefix="/bills", tags=["bills"])
 
@@ -77,6 +77,8 @@ def update_bill(
         updates["name"] = updates["name"].strip()
     for field, value in updates.items():
         setattr(bill, field, value)
+    if updates:
+        clear_bill_notifications(db, user.id, bill.id)
     db.commit()
     try:
         evaluate_notifications(db, user)
@@ -95,6 +97,7 @@ def delete_bill(
     bill = db.scalar(select(Bill).where(Bill.id == bill_id, Bill.user_id == user.id))
     if bill is None:
         raise HTTPException(status_code=404, detail="Bill not found")
+    clear_bill_notifications(db, user.id, bill.id)
     db.delete(bill)
     db.commit()
     return MessageResponse(message="Bill deleted")

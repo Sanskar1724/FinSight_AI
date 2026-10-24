@@ -477,7 +477,7 @@ def build_insights(
                     ],
                     metric=budget.risk.projected_spend,
                     action_label="Simulate a change",
-                    action_url="/analytics?tab=scenarios",
+                    action_url="/scenarios",
                 )
             )
 
@@ -558,7 +558,7 @@ def build_insights(
                 ],
                 metric=candidate.average_amount,
                 action_label="Inspect candidates",
-                action_url="/analytics?tab=recurring",
+                action_url="/analytics?tab=patterns",
             )
         )
 
@@ -579,7 +579,7 @@ def build_insights(
                 ],
                 metric=anomaly.amount,
                 action_label="Review transaction",
-                action_url="/transactions?flagged=1",
+                action_url=f"/transactions?flagged={anomaly.transaction_id}",
             )
         )
 

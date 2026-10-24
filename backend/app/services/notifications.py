@@ -14,7 +14,7 @@ from decimal import Decimal
 from typing import Sequence
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -41,6 +41,7 @@ from app.services.ledger import (
 )
 
 MAX_PER_CATEGORY_PER_DAY = 6
+QUIET_HOURS_DEFERRED = {"weekly_summary", "monthly_summary"}
 
 PREFERENCE_FIELD = {
     "budget_threshold": "budget_warning_enabled",
@@ -104,7 +105,15 @@ def quiet_hours_end(preference: NotificationPreference, local_now: datetime) -> 
     return candidate
 
 
-def _scheduled_for(preference: NotificationPreference, local_now: datetime) -> datetime | None:
+def _scheduled_for(
+    preference: NotificationPreference,
+    local_now: datetime,
+    *,
+    notification_type: str,
+    severity: str,
+) -> datetime | None:
+    if severity == "critical" or notification_type not in QUIET_HOURS_DEFERRED:
+        return None
     if not in_quiet_hours(preference, local_now):
         return None
     return quiet_hours_end(preference, local_now).astimezone(timezone.utc).replace(tzinfo=None)
@@ -159,7 +168,12 @@ def _add_notification(
     local_now = local_now or _local_now()
     if _rate_limited(db, user_id, notification_type, utcnow()):
         return None
-    scheduled_for = _scheduled_for(preference, local_now)
+    scheduled_for = _scheduled_for(
+        preference,
+        local_now,
+        notification_type=notification_type,
+        severity=severity,
+    )
     notification = Notification(
         user_id=user_id,
         category=notification_type,
@@ -184,6 +198,88 @@ def _add_notification(
         )
     )
     return notification
+
+
+def _delete_notifications(
+    db: Session, user_id: int, event_prefixes: Sequence[str]
+) -> int:
+    if not event_prefixes:
+        return 0
+    prefix_conditions = [
+        Notification.event_key.startswith(prefix, autoescape=True)
+        for prefix in event_prefixes
+    ]
+    rows = db.scalars(
+        select(Notification).where(
+            Notification.user_id == user_id,
+            or_(*prefix_conditions),
+        )
+    ).all()
+    for row in rows:
+        db.delete(row)
+    if rows:
+        db.flush()
+    return len(rows)
+
+
+def _delete_stale_stage(
+    db: Session,
+    user_id: int,
+    *,
+    category: str,
+    event_prefixes: Sequence[str],
+    keep_event_key: str | None,
+) -> int:
+    prefix_conditions = [
+        Notification.event_key.startswith(prefix, autoescape=True)
+        for prefix in event_prefixes
+    ]
+    conditions = [
+        Notification.user_id == user_id,
+        Notification.category == category,
+        or_(*prefix_conditions),
+    ]
+    if keep_event_key is not None:
+        conditions.append(Notification.event_key != keep_event_key)
+    rows = db.scalars(select(Notification).where(*conditions)).all()
+    for row in rows:
+        db.delete(row)
+    if rows:
+        db.flush()
+    return len(rows)
+
+
+def clear_bill_notifications(db: Session, user_id: int, bill_id: int) -> int:
+    return _delete_notifications(db, user_id, [f"bill:{bill_id}:"])
+
+
+def clear_budget_notifications(db: Session, user_id: int, budget_id: int) -> int:
+    return _delete_notifications(
+        db,
+        user_id,
+        [
+            f"budget_warning:{budget_id}:",
+            f"budget_critical:{budget_id}:",
+            f"budget_exceeded:{budget_id}:",
+            f"budget_risk:{budget_id}:",
+        ],
+    )
+
+
+def clear_goal_notifications(db: Session, user_id: int, goal_id: int) -> int:
+    return _delete_notifications(db, user_id, [f"goal_behind:{goal_id}:"])
+
+
+def clear_anomaly_notifications(
+    db: Session, user_id: int, transaction_id: int
+) -> int:
+    return _delete_notifications(db, user_id, [f"anomaly:{transaction_id}"])
+
+
+def clear_recurring_notifications(
+    db: Session, user_id: int, merchant_key: str
+) -> int:
+    return _delete_notifications(db, user_id, [f"recurring:{merchant_key}:"])
 
 
 def create_app_notification(
@@ -241,9 +337,24 @@ def evaluate_notifications(
 
     budgets = budgets_for_month(db, user.id, current_month, today)
     for budget in budgets:
-        threshold = preference.warning_threshold
-        critical = preference.critical_threshold
-        if budget.utilization >= 100:
+        threshold = budget.warning_threshold
+        critical = budget.critical_threshold
+        exceeded_key = f"budget_exceeded:{budget.id}:{budget.month.isoformat()}"
+        critical_key = f"budget_critical:{budget.id}:{budget.month.isoformat()}"
+        warning_key = f"budget_warning:{budget.id}:{budget.month.isoformat()}"
+        threshold_prefixes = [
+            f"budget_warning:{budget.id}:{budget.month.isoformat()}",
+            f"budget_critical:{budget.id}:{budget.month.isoformat()}",
+            f"budget_exceeded:{budget.id}:{budget.month.isoformat()}",
+        ]
+        if budget.status == "exceeded":
+            _delete_stale_stage(
+                db,
+                user.id,
+                category="budget_threshold",
+                event_prefixes=threshold_prefixes,
+                keep_event_key=exceeded_key,
+            )
             record(
                 _add_notification(
                     db,
@@ -260,7 +371,7 @@ def evaluate_notifications(
                     trigger_reason=(
                         f"Actual spend crossed 100% of the limit for {budget.month:%B %Y}."
                     ),
-                    event_key=f"budget_exceeded:{budget.id}:{budget.month.isoformat()}",
+                    event_key=exceeded_key,
                     amount=budget.actual_spend,
                     action_label="Review spending",
                     action_url="/budgets",
@@ -268,7 +379,14 @@ def evaluate_notifications(
                 ),
                 f"{budget.category.name} exceeded budget",
             )
-        elif budget.utilization >= critical:
+        elif budget.status == "critical":
+            _delete_stale_stage(
+                db,
+                user.id,
+                category="budget_threshold",
+                event_prefixes=threshold_prefixes,
+                keep_event_key=critical_key,
+            )
             record(
                 _add_notification(
                     db,
@@ -276,7 +394,11 @@ def evaluate_notifications(
                     preference,
                     notification_type="budget_threshold",
                     severity="critical",
-                    title=f"{budget.category.name} budget is nearly used up",
+                    title=(
+                        f"{budget.category.name} budget limit reached"
+                        if budget.utilization >= 100
+                        else f"{budget.category.name} budget is nearly used up"
+                    ),
                     message=(
                         f"You have used ₹{budget.actual_spend:,.2f} of your "
                         f"₹{budget.limit_amount:,.2f} {budget.category.name.lower()} budget "
@@ -286,7 +408,7 @@ def evaluate_notifications(
                         f"Configured critical threshold of {critical}% crossed for "
                         f"{budget.month:%B %Y}."
                     ),
-                    event_key=f"budget_critical:{budget.id}:{budget.month.isoformat()}",
+                    event_key=critical_key,
                     amount=budget.actual_spend,
                     action_label="Review budget",
                     action_url="/budgets",
@@ -294,7 +416,14 @@ def evaluate_notifications(
                 ),
                 f"{budget.category.name} crossed the critical budget threshold",
             )
-        elif budget.utilization >= threshold:
+        elif budget.status == "approaching":
+            _delete_stale_stage(
+                db,
+                user.id,
+                category="budget_threshold",
+                event_prefixes=threshold_prefixes,
+                keep_event_key=warning_key,
+            )
             record(
                 _add_notification(
                     db,
@@ -312,7 +441,7 @@ def evaluate_notifications(
                         f"Configured warning threshold of {threshold}% crossed for "
                         f"{budget.month:%B %Y}."
                     ),
-                    event_key=f"budget_warning:{budget.id}:{budget.month.isoformat()}",
+                    event_key=warning_key,
                     amount=budget.actual_spend,
                     action_label="Review budget",
                     action_url="/budgets",
@@ -320,12 +449,29 @@ def evaluate_notifications(
                 ),
                 f"{budget.category.name} crossed the warning threshold",
             )
+        else:
+            _delete_stale_stage(
+                db,
+                user.id,
+                category="budget_threshold",
+                event_prefixes=threshold_prefixes,
+                keep_event_key=None,
+            )
 
-        if (
+        risk_key = f"budget_risk:{budget.id}:{budget.month.isoformat()}"
+        risk_active = (
             budget.risk is not None
             and budget.risk.risk_level in {"at_risk", "likely_over"}
             and budget.actual_spend < budget.limit_amount
-        ):
+        )
+        _delete_stale_stage(
+            db,
+            user.id,
+            category="budget_risk",
+            event_prefixes=[risk_key],
+            keep_event_key=risk_key if risk_active else None,
+        )
+        if risk_active:
             record(
                 _add_notification(
                     db,
@@ -343,10 +489,10 @@ def evaluate_notifications(
                         f"Burn-rate projection uses {budget.risk.elapsed_days} elapsed days and "
                         f"{budget.risk.history_months_used} historical month(s)."
                     ),
-                    event_key=f"budget_risk:{budget.id}:{budget.month.isoformat()}",
+                    event_key=risk_key,
                     amount=budget.risk.projected_spend,
                     action_label="Run a scenario",
-                    action_url="/analytics?tab=scenarios",
+                    action_url="/scenarios",
                     local_now=local_now,
                 ),
                 f"{budget.category.name} projected overrun",
@@ -364,6 +510,7 @@ def evaluate_notifications(
     txn_merchants = {txn.id: txn for txn in history_txns}
     for anomaly in anomalies:
         if anomaly.transaction_id in feedback:
+            clear_anomaly_notifications(db, user.id, anomaly.transaction_id)
             continue
         category_name = categories.get(anomaly.category_id)
         record(
@@ -400,7 +547,10 @@ def evaluate_notifications(
         ).all()
     }
     for candidate in recurring:
-        if candidate.confidence < 0.5 or overrides.get(candidate.merchant_key) == "dismissed":
+        if candidate.confidence < 0.5:
+            continue
+        if overrides.get(candidate.merchant_key) in {"confirmed", "dismissed"}:
+            clear_recurring_notifications(db, user.id, candidate.merchant_key)
             continue
         record(
             _add_notification(
@@ -421,7 +571,7 @@ def evaluate_notifications(
                 event_key=f"recurring:{candidate.merchant_key}:{current_month.isoformat()}",
                 amount=candidate.average_amount,
                 action_label="Inspect candidates",
-                action_url="/analytics?tab=recurring",
+                action_url="/analytics?tab=patterns",
                 local_now=local_now,
             ),
             f"Recurring candidate: {candidate.merchant}",
@@ -441,10 +591,20 @@ def evaluate_notifications(
             title = f"{bill.name} is overdue"
             timing = f"was due {abs(days_left)} day(s) ago"
             severity = "critical"
+            stage = "overdue"
         else:
             title = f"{bill.name} due soon"
             timing = f"is due in {days_left} day(s)" if days_left else "is due today"
             severity = "warning" if days_left <= 3 else "info"
+            stage = severity
+        event_key = f"bill:{bill.id}:{bill.due_date.isoformat()}:{stage}"
+        _delete_stale_stage(
+            db,
+            user.id,
+            category="bill_due",
+            event_prefixes=[f"bill:{bill.id}:"],
+            keep_event_key=event_key,
+        )
         record(
             _add_notification(
                 db,
@@ -455,10 +615,10 @@ def evaluate_notifications(
                 title=title,
                 message=f"Your user-entered bill of ₹{dec(bill.amount):,.2f} {timing} ({bill.due_date:%d %b}).",
                 trigger_reason="User-entered bill due-date rule (7-day window).",
-                event_key=f"bill:{bill.id}:{bill.due_date.isoformat()}",
+                event_key=event_key,
                 amount=dec(bill.amount),
                 action_label="Manage bills",
-                action_url="/notifications?tab=bills",
+                action_url="/settings?tab=bills",
                 local_now=local_now,
             ),
             f"Bill reminder: {bill.name}",
@@ -466,8 +626,24 @@ def evaluate_notifications(
 
     goals = goals_for_user(db, user.id, today)
     for goal in goals:
+        goal_prefix = f"goal_behind:{goal.id}:{current_month.isoformat()}"
         if goal.status not in {"behind", "at_risk"}:
+            _delete_stale_stage(
+                db,
+                user.id,
+                category="goal_behind",
+                event_prefixes=[goal_prefix],
+                keep_event_key=None,
+            )
             continue
+        goal_key = f"{goal_prefix}:{goal.status}"
+        _delete_stale_stage(
+            db,
+            user.id,
+            category="goal_behind",
+            event_prefixes=[goal_prefix],
+            keep_event_key=goal_key,
+        )
         record(
             _add_notification(
                 db,
@@ -485,7 +661,7 @@ def evaluate_notifications(
                 trigger_reason=(
                     f"Contribution pace is below the linear schedule. Status: {goal.status}."
                 ),
-                event_key=f"goal_behind:{goal.id}:{current_month.isoformat()}",
+                event_key=goal_key,
                 amount=goal.remaining_amount,
                 action_label="Review goal",
                 action_url="/goals",
@@ -562,8 +738,8 @@ def evaluate_notifications(
                 trigger_reason="Monthly summary generated from complete previous-month records.",
                 event_key=f"monthly_summary:{previous_month.isoformat()}",
                 amount=flow.net,
-                action_label="Open dashboard",
-                action_url=f"/?start={p_start.isoformat()}&end={p_end.isoformat()}",
+                action_label="Open analytics",
+                action_url="/analytics",
                 local_now=local_now,
             ),
             "Monthly summary",

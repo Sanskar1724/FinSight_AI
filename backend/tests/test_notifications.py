@@ -156,3 +156,109 @@ def test_bill_reminders_respect_window_and_paid_state(client: TestClient) -> Non
         if "Soon bill" in item["title"]
     ]
     assert remaining == []
+
+
+def _budget_alerts(client: TestClient) -> list[dict]:
+    items = client.get(
+        "/api/notifications", params={"category": "budget_threshold", "page_size": 100}
+    ).json()["items"]
+    return items
+
+
+def test_budget_alert_moves_between_stages_without_duplicates(client: TestClient) -> None:
+    signup(client)
+    food = category_id(client, "food-dining")
+    budget = client.post(
+        "/api/budgets",
+        json={"category_id": food, "month": current_month().isoformat(), "limit_amount": "1000.00"},
+    ).json()
+    create_transaction(client, amount="750.00", merchant="Food place")
+    alerts = _budget_alerts(client)
+    assert [item["event_key"].split(":")[0] for item in alerts] == ["budget_warning"]
+
+    create_transaction(client, amount="300.00", merchant="Food place")
+    alerts = _budget_alerts(client)
+    assert [item["event_key"].split(":")[0] for item in alerts] == ["budget_exceeded"]
+    assert alerts[0]["severity"] == "critical"
+
+    # Raising the limit resolves the exceeded alert entirely.
+    client.patch(f"/api/budgets/{budget['id']}", json={"limit_amount": "5000.00"})
+    assert _budget_alerts(client) == []
+
+
+def test_exactly_one_hundred_percent_is_limit_reached_not_exceeded(client: TestClient) -> None:
+    signup(client)
+    food = category_id(client, "food-dining")
+    client.post(
+        "/api/budgets",
+        json={"category_id": food, "month": current_month().isoformat(), "limit_amount": "1000.00"},
+    )
+    create_transaction(client, amount="1000.00", merchant="Food place")
+    alerts = _budget_alerts(client)
+    assert len(alerts) == 1
+    assert alerts[0]["event_key"].startswith("budget_critical:")
+    assert "limit reached" in alerts[0]["title"]
+
+
+def test_new_budget_inherits_preference_thresholds(client: TestClient) -> None:
+    signup(client)
+    client.put(
+        "/api/notifications/preferences",
+        json={"warning_threshold": 50, "critical_threshold": 80},
+    )
+    food = category_id(client, "food-dining")
+    created = client.post(
+        "/api/budgets",
+        json={"category_id": food, "month": current_month().isoformat(), "limit_amount": "1000.00"},
+    )
+    assert created.status_code == 201, created.text
+    assert created.json()["warning_threshold"] == 50
+    assert created.json()["critical_threshold"] == 80
+
+    conflicting = client.post(
+        "/api/budgets",
+        json={
+            "category_id": category_id(client, "groceries"),
+            "month": current_month().isoformat(),
+            "limit_amount": "1000.00",
+            "critical_threshold": 40,
+        },
+    )
+    assert conflicting.status_code == 422
+
+
+def test_deleting_a_budget_removes_its_alerts(client: TestClient) -> None:
+    signup(client)
+    food = category_id(client, "food-dining")
+    budget = client.post(
+        "/api/budgets",
+        json={"category_id": food, "month": current_month().isoformat(), "limit_amount": "1000.00"},
+    ).json()
+    create_transaction(client, amount="950.00", merchant="Food place")
+    assert _budget_alerts(client)
+    assert client.delete(f"/api/budgets/{budget['id']}").status_code == 200
+    assert _budget_alerts(client) == []
+
+
+def test_quiet_hours_defer_only_non_critical_summaries() -> None:
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    from app.models import NotificationPreference
+    from app.services.notifications import _scheduled_for
+
+    preference = NotificationPreference(
+        quiet_hours_enabled=True, quiet_start="22:00", quiet_end="07:00"
+    )
+    night = datetime(2026, 3, 10, 23, 30, tzinfo=ZoneInfo("Asia/Kolkata"))
+    day = datetime(2026, 3, 10, 12, 0, tzinfo=ZoneInfo("Asia/Kolkata"))
+
+    assert _scheduled_for(preference, night, notification_type="weekly_summary", severity="info")
+    assert _scheduled_for(preference, day, notification_type="weekly_summary", severity="info") is None
+    assert (
+        _scheduled_for(preference, night, notification_type="budget_threshold", severity="critical")
+        is None
+    )
+    assert (
+        _scheduled_for(preference, night, notification_type="bill_due", severity="warning") is None
+    )

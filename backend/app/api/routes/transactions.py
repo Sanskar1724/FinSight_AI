@@ -32,7 +32,11 @@ from app.services.csv_import import import_rows, parse_csv
 from app.services.finance import detect_anomalies, q
 from app.services.ledger import as_txn, dec, resolve_category, txns_between
 
-from app.services.notifications import create_app_notification, evaluate_notifications
+from app.services.notifications import (
+    clear_anomaly_notifications,
+    create_app_notification,
+    evaluate_notifications,
+)
 
 router = APIRouter(prefix="/transactions", tags=["transactions"])
 logger = logging.getLogger(__name__)
@@ -86,13 +90,15 @@ def _query_transactions(
             )
         )
         use_join = True
-    flagged_ids: list[int] | None = None
-    if flagged is not None and flagged != "":
-        recent = txns_between(db, user.id, date.today() - timedelta(days=365), date.today())
-        anomalies = detect_anomalies([as_txn(txn) for txn in recent], date.today())
+    if flagged:
+        # "1" (or any non-numeric value) means "all current anomalies"; any other
+        # integer targets a single transaction, as used by notification links.
         if flagged.isdigit() and flagged != "1":
             flagged_ids = [int(flagged)]
         else:
+            today = date.today()
+            recent = txns_between(db, user.id, today - timedelta(days=365), today)
+            anomalies = detect_anomalies([as_txn(txn) for txn in recent], today)
             flagged_ids = [item.transaction_id for item in anomalies]
         conditions.append(Transaction.id.in_(flagged_ids))
     statement = select(Transaction).options(joinedload(Transaction.category)).where(*conditions)
@@ -184,6 +190,7 @@ def export_transactions(
     type: str | None = None,
     category_id: int | None = None,
     search: str | None = Query(default=None, max_length=120),
+    flagged: str | None = None,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> StreamingResponse:
@@ -195,7 +202,7 @@ def export_transactions(
         txn_type=type,
         category_id=category_id,
         search=search,
-        flagged=None,
+        flagged=flagged,
         sort="date_desc",
     )
     rows = db.scalars(statement).all()
@@ -361,6 +368,7 @@ def update_transaction(
         updates["notes"] = updates["notes"].strip() or None
     for field, value in updates.items():
         setattr(txn, field, value)
+    clear_anomaly_notifications(db, user.id, txn.id)
     db.commit()
     db.refresh(txn)
     _evaluate_after_change(db, user)
@@ -381,6 +389,7 @@ def delete_transaction(
     )
     if txn is None:
         raise HTTPException(status_code=404, detail="Transaction not found")
+    clear_anomaly_notifications(db, user.id, txn.id)
     db.delete(txn)
     db.commit()
     return MessageResponse(message="Transaction deleted")

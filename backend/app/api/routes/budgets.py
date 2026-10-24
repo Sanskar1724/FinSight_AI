@@ -18,6 +18,11 @@ from app.schemas import (
 )
 from app.services.finance import add_months, q
 from app.services.ledger import build_budget_out, budgets_for_month, resolve_category
+from app.services.notifications import (
+    clear_budget_notifications,
+    evaluate_notifications,
+    get_or_create_preferences,
+)
 
 router = APIRouter(prefix="/budgets", tags=["budgets"])
 
@@ -80,16 +85,35 @@ def create_budget(
         raise HTTPException(
             status_code=409, detail="A budget already exists for this category and month"
         )
+    preference = get_or_create_preferences(db, user.id)
+    warning = (
+        payload.warning_threshold
+        if payload.warning_threshold is not None
+        else preference.warning_threshold
+    )
+    critical = (
+        payload.critical_threshold
+        if payload.critical_threshold is not None
+        else preference.critical_threshold
+    )
+    if critical <= warning:
+        raise HTTPException(
+            status_code=422, detail="Critical threshold must be greater than warning threshold"
+        )
     budget = Budget(
         user_id=user.id,
         category_id=category.id,
         month=month,
         limit_amount=q(payload.limit_amount),
-        warning_threshold=payload.warning_threshold,
-        critical_threshold=payload.critical_threshold,
+        warning_threshold=warning,
+        critical_threshold=critical,
     )
     db.add(budget)
     db.commit()
+    try:
+        evaluate_notifications(db, user)
+    except Exception:
+        db.rollback()
     budget = db.scalar(
         select(Budget).options(joinedload(Budget.category)).where(Budget.id == budget.id)
     )
@@ -122,7 +146,13 @@ def update_budget(
         updates["limit_amount"] = q(updates["limit_amount"])
     for field, value in updates.items():
         setattr(budget, field, value)
+    if updates:
+        clear_budget_notifications(db, user.id, budget.id)
     db.commit()
+    try:
+        evaluate_notifications(db, user)
+    except Exception:
+        db.rollback()
     db.refresh(budget)
     return build_budget_out(db, budget)
 
@@ -138,6 +168,7 @@ def delete_budget(
     )
     if budget is None:
         raise HTTPException(status_code=404, detail="Budget not found")
+    clear_budget_notifications(db, user.id, budget.id)
     db.delete(budget)
     db.commit()
     return MessageResponse(message="Budget deleted")
@@ -176,4 +207,8 @@ def copy_previous_month(
             )
         )
     db.commit()
+    try:
+        evaluate_notifications(db, user)
+    except Exception:
+        db.rollback()
     return _list_response(db, user, target)
