@@ -36,21 +36,28 @@ export function MetricCard({
   const ChangeIcon = isFlat ? Minus : change > 0 ? ArrowUpRight : ArrowDownRight;
 
   return (
-    <Card className="relative overflow-hidden p-5">
+    <Card className="relative overflow-hidden p-4 sm:p-5">
       <div className="flex items-start justify-between gap-3">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.11em] text-muted-foreground">
+        <p className="truncate text-[10px] font-semibold uppercase tracking-[0.11em] text-muted-foreground sm:text-[11px]">
           {label}
         </p>
-        <span className={cn("grid size-8 place-items-center rounded-lg border", accents[accent])}>
+        <span
+          className={cn(
+            "grid size-7 shrink-0 place-items-center rounded-lg border sm:size-8",
+            accents[accent],
+          )}
+        >
           <Icon className="size-3.5" />
         </span>
       </div>
       {loading ? (
         <div className="mt-4 h-8 w-32 animate-pulse rounded-lg bg-secondary" />
       ) : (
-        <p className="mt-2 truncate text-[26px] font-semibold tracking-[-0.035em] tabular">{value}</p>
+        <p className="mt-2 truncate text-xl font-semibold tracking-[-0.035em] tabular sm:text-[26px]">
+          {value}
+        </p>
       )}
-      <div className="mt-2 flex items-center gap-2">
+      <div className="mt-2 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
         {!isFlat && change !== null && change !== undefined && (
           <span
             className={cn(

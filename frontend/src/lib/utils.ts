@@ -10,6 +10,13 @@ const inr = new Intl.NumberFormat("en-IN", {
   style: "currency",
   currency: "INR",
   minimumFractionDigits: 0,
+  maximumFractionDigits: 0,
+});
+
+const inrPaise = new Intl.NumberFormat("en-IN", {
+  style: "currency",
+  currency: "INR",
+  minimumFractionDigits: 2,
   maximumFractionDigits: 2,
 });
 
@@ -26,7 +33,10 @@ const number = new Intl.NumberFormat("en-IN", {
 
 export function formatINR(value: number | null | undefined, compact = false) {
   if (value === null || value === undefined || Number.isNaN(value)) return "—";
-  return (compact ? inrCompact : inr).format(value);
+  if (compact) return inrCompact.format(value);
+  // Whole rupees stay compact (₹45,000); amounts with paise always show two
+  // decimals (₹183.70) so columns of figures line up.
+  return (Number.isInteger(Math.round(value * 100) / 100) ? inr : inrPaise).format(value);
 }
 
 export function formatNumber(value: number | null | undefined, suffix = "") {

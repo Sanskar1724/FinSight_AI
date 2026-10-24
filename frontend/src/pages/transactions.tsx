@@ -445,7 +445,7 @@ export default function TransactionsPage() {
                         {formatINR(txn.amount)}
                       </td>
                       <td className="px-5 py-3.5">
-                        <div className="flex justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                        <div className="flex justify-end gap-1 opacity-50 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
                           <Button
                             variant="ghost"
                             size="icon-sm"

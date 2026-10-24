@@ -276,7 +276,7 @@ export default function AnalyticsPage() {
         </Card>
       ) : data ? (
         <>
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
             <MetricCard
               label="Income in range"
               value={formatINR(totals.income)}
@@ -511,7 +511,12 @@ export default function AnalyticsPage() {
                                       {item.change.toFixed(0)}%
                                     </span>
                                   ) : (
-                                    <span className="w-12 text-right text-muted-foreground">new</span>
+                                    <span
+                                      className="w-16 text-right text-[10px] text-muted-foreground"
+                                      title="No spending in this category during the comparison period"
+                                    >
+                                      no prior
+                                    </span>
                                   )}
                                 </div>
                               </div>

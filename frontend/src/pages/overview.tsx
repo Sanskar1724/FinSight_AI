@@ -8,7 +8,6 @@ import {
   ChevronRight,
   CircleDollarSign,
   Lightbulb,
-  Plus,
   RefreshCw,
   Sparkles,
   Target,
@@ -78,7 +77,7 @@ function OverviewSkeleton() {
         </div>
         <Skeleton className="h-10 w-36" />
       </div>
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         {Array.from({ length: 4 }).map((_, index) => (
           <Skeleton key={index} className="h-[132px] rounded-2xl" />
         ))}
@@ -113,6 +112,19 @@ export default function OverviewPage() {
         .slice(0, 4),
     [data?.budgets],
   );
+
+  const [flowMode, setFlowMode] = useState<"cumulative" | "daily">("cumulative");
+  const flowData = useMemo(() => {
+    const trend = data?.trend ?? [];
+    if (flowMode === "daily") return trend;
+    let income = 0;
+    let expenses = 0;
+    return trend.map((point) => {
+      income += point.income;
+      expenses += point.expenses;
+      return { ...point, income, expenses, net: income - expenses };
+    });
+  }, [data, flowMode]);
 
   const totalCategory = useMemo(
     () => (data?.category_breakdown ?? []).reduce((sum, item) => sum + item.amount, 0),
@@ -163,10 +175,6 @@ export default function OverviewPage() {
                 <ArrowRight className="size-3.5" />
               </Link>
             </Button>
-            <Button size="sm" onClick={() => setDialogOpen(true)}>
-              <Plus className="size-4" />
-              Add transaction
-            </Button>
           </>
         }
       />
@@ -194,7 +202,7 @@ export default function OverviewPage() {
         </Card>
       )}
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         <MetricCard
           label="Income"
           value={formatINR(data.summary.income)}
@@ -233,21 +241,49 @@ export default function OverviewPage() {
           <CardHeader className="flex-row items-start justify-between gap-4 space-y-0">
             <div>
               <CardTitle>Cash flow</CardTitle>
-              <CardDescription>Income and spending across the selected period</CardDescription>
+              <CardDescription>
+                {flowMode === "cumulative"
+                  ? "Running totals of income and spending this period"
+                  : "Income and spending per period bucket"}
+              </CardDescription>
             </div>
-            <div className="hidden items-center gap-4 text-[10px] font-medium text-muted-foreground sm:flex">
-              <span className="inline-flex items-center gap-1.5">
-                <span className="size-2 rounded-full bg-emerald-500" /> Income
-              </span>
-              <span className="inline-flex items-center gap-1.5">
-                <span className="size-2 rounded-full bg-amber-400" /> Expenses
-              </span>
+            <div className="flex flex-col items-end gap-2">
+              <div
+                role="group"
+                aria-label="Cash flow view"
+                className="inline-flex rounded-lg border border-border bg-secondary/60 p-0.5 text-[11px] font-semibold"
+              >
+                {(["cumulative", "daily"] as const).map((mode) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    aria-pressed={flowMode === mode}
+                    onClick={() => setFlowMode(mode)}
+                    className={cn(
+                      "rounded-md px-2.5 py-1 capitalize transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                      flowMode === mode
+                        ? "bg-card text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    {mode}
+                  </button>
+                ))}
+              </div>
+              <div className="hidden items-center gap-4 text-[10px] font-medium text-muted-foreground sm:flex">
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="size-2 rounded-full bg-emerald-500" /> Income
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="size-2 rounded-full bg-amber-400" /> Expenses
+                </span>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
             <div className="h-[250px] w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={data.trend} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+                <AreaChart data={flowData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
                   <defs>
                     <linearGradient id="income-fill" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor="#10b981" stopOpacity={0.22} />
@@ -392,12 +428,12 @@ export default function OverviewPage() {
               />
             ) : (
               <div className="space-y-3">
-                {data.insights.slice(0, 3).map((insight) => {
+                {data.insights.slice(0, 3).map((insight, index) => {
                   const style = severityStyles[insight.severity];
                   const Icon = style.icon;
                   return (
                     <div
-                      key={insight.rule_id}
+                      key={`${insight.rule_id}-${index}`}
                       className="rounded-xl border border-border/70 bg-background/50 p-3"
                     >
                       <div className="flex items-start gap-2.5">

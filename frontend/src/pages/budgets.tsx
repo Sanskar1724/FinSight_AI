@@ -8,6 +8,7 @@ import {
   ChevronRight,
   Copy,
   Gauge,
+  Minus,
   Pencil,
   Plus,
   Trash2,
@@ -363,7 +364,15 @@ export default function BudgetsPage() {
                         </div>
                       )}
 
-                      {budget.change_vs_previous !== null && (
+                      {budget.change_vs_previous !== null &&
+                        Math.abs(budget.change_vs_previous) < 0.5 && (
+                          <p className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                            <Minus className="size-3" />
+                            Same as last month
+                          </p>
+                        )}
+                      {budget.change_vs_previous !== null &&
+                        Math.abs(budget.change_vs_previous) >= 0.5 && (
                         <p className="flex items-center gap-1 text-[10px] text-muted-foreground">
                           {budget.change_vs_previous > 0 ? (
                             <ArrowRight className="size-3 text-rose-500" />
