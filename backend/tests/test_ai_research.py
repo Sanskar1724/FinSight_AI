@@ -4,6 +4,8 @@ import json
 
 from fastapi.testclient import TestClient
 
+from tests.conftest import create_transaction, signup
+
 
 def test_deterministic_ai_answers_are_grounded_and_safe(client: TestClient) -> None:
     login = client.post("/api/auth/demo")
@@ -165,3 +167,59 @@ def test_ai_session_can_be_deleted(client: TestClient) -> None:
     session_id = chat.json()["session_id"]
     assert client.delete(f"/api/ai/sessions/{session_id}").status_code == 200
     assert client.get(f"/api/ai/sessions/{session_id}").status_code == 404
+
+
+def test_intent_separates_definitions_from_personal_questions() -> None:
+    from app.services.ai_context import detect_intent
+
+    def intent(question: str) -> str:
+        return detect_intent(question, None, None, None, False)
+
+    assert intent("What is my net cash flow this month?") == "cash_flow"
+    assert intent("What is my savings rate?") == "cash_flow"
+    assert intent("What are my recurring payments?") == "recurring"
+    assert intent("What is a sinking fund?") == "general"
+    assert intent("Explain the 50/30/20 rule") == "general"
+    assert intent("What is cash flow?") == "general"
+
+
+def test_net_cash_flow_question_is_answered_from_records(client: TestClient) -> None:
+    signup(client)
+    create_transaction(client, slug="salary", txn_type="income", amount="50000.00", merchant="Employer")
+    create_transaction(client, amount="12000.00", merchant="Landlord", slug="rent")
+
+    body = client.post("/api/ai/chat", json={"message": "What is my net cash flow this month?"}).json()
+    assert "₹38,000.00" in body["answer"]
+    assert any(item["id"] == "cash_flow" for item in body["evidence"])
+
+
+def test_intent_covers_common_phrasings() -> None:
+    from app.services.ai_context import detect_intent
+
+    def intent(question: str) -> str:
+        return detect_intent(question, None, None, None, False)
+
+    assert intent("What did I spend last month?") == "total_spending"
+    assert intent("what are my subscriptions") == "recurring"
+    assert intent("How am I doing this month?") == "cash_flow"
+    assert intent("Give me a summary of my finances") == "cash_flow"
+    assert intent("Show my biggest expenses") == "top_category"
+    assert intent("How can I budget with an irregular freelance income?") == "general"
+    assert intent("Am I over budget on shopping?") == "budget_status"
+
+
+def test_this_month_versus_last_month_is_about_this_month() -> None:
+    from datetime import date
+
+    from app.services.ai_context import detect_period
+
+    today = date(2026, 10, 24)
+    start, end, label, explicit = detect_period(
+        "Compare my Transport spending this month with last month.", today
+    )
+    assert (start, end, explicit) == (date(2026, 10, 1), today, True)
+    assert detect_period("How does this month's spending compare with last month?", today)[0] == date(2026, 10, 1)
+    assert detect_period("What was my income last month?", today)[:2] == (
+        date(2026, 9, 1),
+        date(2026, 9, 30),
+    )

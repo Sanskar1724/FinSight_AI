@@ -62,11 +62,14 @@ def detect_period(question: str, today: date) -> tuple[date, date, str, bool]:
         return today - timedelta(days=6), today, "last 7 days", True
     if re.search(r"\blast 30 days|past 30 days\b", q):
         return today - timedelta(days=29), today, "last 30 days", True
-    if re.search(r"\blast month|previous month\b", q):
+    mentions_this_month = re.search(r"\b(this|current) month\b|\bthis month's\b", q)
+    if re.search(r"\blast month|previous month\b", q) and not mentions_this_month:
+        # "this month vs last month" is about this month; the previous period
+        # is supplied automatically as the comparison.
         month = finance.add_months(month_start, -1)
         start, end = finance.month_bounds(month)
         return start, end, finance.month_label(start), True
-    if re.search(r"\bthis month|current month\b", q):
+    if mentions_this_month:
         return month_start, today, f"this month ({today:%b %Y})", True
     if re.search(r"\blast year|previous year\b", q):
         return date(today.year - 1, 1, 1), date(today.year - 1, 12, 31), str(today.year - 1), True
@@ -170,7 +173,10 @@ def detect_intent(
         r"\b(guarantee|guaranteed|assure|promise)\b.*\b(return|profit|interest)\b", q
     ) or re.search(r"\b20% return|20 % return|double my money\b", q):
         return "unsupported_advice"
-    if re.search(r"^(explain|what is|what are)\b", q):
+    # Definition questions ("What is a sinking fund?") are general education, but
+    # "What is my net cash flow?" asks about the user's own records.
+    personal = re.search(r"\b(my|me|mine|i|i'm|i've)\b", q)
+    if re.search(r"^(explain|what is|what are)\b", q) and not personal:
         return "general"
     if re.search(r"international travel", q):
         return "missing_data"
@@ -178,27 +184,40 @@ def detect_intent(
         return "missing_data"
     if goal is not None and re.search(r"goal|fund|track|reach|progress|12 month", q):
         return "goal_status"
-    if re.search(r"recurring|subscription audit|repeat payment", q):
+    if re.search(r"recurring|subscriptions?\b|repeat payment", q):
         return "recurring"
     if re.search(r"unusual|anomal|unusually large|suspicious|fraud", q):
         return "anomaly"
     if re.search(r"\bcut\b|\breduce\b|if i (save|spend)|scenario|what if", q):
         return "scenario"
+    # "How can I budget with irregular income?" asks for guidance, not figures.
+    if re.search(r"^how (should|can|do) i\b", q) and not re.search(r"\bhow (much|many)\b", q):
+        return "general"
     if re.search(r"budget|limit|overrun|over budget", q):
         return "budget_status"
     if merchant:
         return "merchant"
     if re.search(r"compare|versus|\bvs\b|higher than|lower than|increase", q):
         return "comparison"
-    if re.search(r"most of my money|top categor|biggest category|where (is|does) my money", q):
+    if re.search(
+        r"most of my money|top categor|biggest (category|expense)|largest expense|where (is|does) my money",
+        q,
+    ):
         return "top_category"
     if category is not None and re.search(r"spen[dt]|expense|how much did i", q):
         return "category_spending"
     if re.search(r"income|earn|salary|stipend|freelance", q):
         return "income_total"
-    if re.search(r"net cash flow|cash flow|saving rate", q):
+    if re.search(
+        r"net cash flow|cash flow|savings? rate|how much (did|have) i save|summary|overview"
+        r"|how am i doing|how('m| am) i doing",
+        q,
+    ):
         return "cash_flow"
-    if re.search(r"how much did i spend|total spending|my spending|total expenses", q):
+    if re.search(
+        r"how much (did|have) i spen[dt]|what (did|have) i spen[dt]|total spending|my spending|total expenses",
+        q,
+    ):
         return "total_spending"
     if re.search(r"^(hi|hello|hey|namaste)\b", q):
         return "greeting"
