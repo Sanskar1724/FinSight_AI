@@ -41,13 +41,21 @@ SQLAlchemy services and models
 - `app/services/ai_context.py` builds the calculated, user-scoped context used by the assistant and research lab.
 - `app/services/ai_service.py` calls the optional hosted provider or produces a deterministic grounded answer.
 - `app/services/research.py` executes baseline/grounded comparisons and rubric scoring.
-- `app/models.py` contains SQLAlchemy models; `alembic/` contains the initial schema migration.
+- `app/models.py` contains SQLAlchemy models; `alembic/` contains the schema migrations.
 
 ## Authentication and isolation
 
-- Registration and demo login issue a JWT signed with `SECRET_KEY`.
-- The token is stored in an HttpOnly, SameSite=Lax cookie named `finsight_session`.
+- Registration and demo login issue a JWT signed with `SECRET_KEY`; the JWT is
+  stored only in an HttpOnly, SameSite=Lax cookie named `finsight_session` and
+  is not returned in the response body.
+- Each JWT carries the user's `token_version`. Logout increments that version,
+  invalidating previously issued sessions. Changing `SECRET_KEY` invalidates
+  every session as well.
 - Passwords use PBKDF2-HMAC-SHA256, a random per-user salt, and 600,000 iterations.
+- Authentication endpoints are rate-limited in-process. Multi-worker
+  deployments should replace the limiter with a shared store.
+- Unsafe requests with a foreign `Origin` are rejected, and responses include
+  standard security headers.
 - Every resource query is scoped to the authenticated user. Unauthorized users and foreign resource IDs both return 404 to avoid leaking existence.
 - `POST /api/auth/demo` and `/api/auth/demo/reset` are intentionally available for the fictional demo account.
 

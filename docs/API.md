@@ -5,7 +5,7 @@ Interactive, authoritative documentation is available at `/api/docs` (Swagger UI
 ## Conventions
 
 - Base path: `/api`.
-- Authentication: the HttpOnly `finsight_session` cookie. Browser requests use same-origin cookies.
+- Authentication: the HttpOnly `finsight_session` cookie. The API does not return bearer tokens in response bodies; browser requests use same-origin cookies. Logout revokes the user's issued sessions.
 - JSON errors use `{ "detail": "..." }`; validation errors use FastAPI's structured detail array.
 - Dates use `YYYY-MM-DD`. Datetimes use UTC and may omit a trailing `Z`.
 - Money values are JSON numbers rounded to two decimal places at the API boundary.
@@ -21,9 +21,15 @@ Interactive, authoritative documentation is available at `/api/docs` (Swagger UI
 | POST | `/auth/register` | Create an account and session. |
 | POST | `/auth/login` | Sign in. |
 | POST | `/auth/demo` | Create/repair and enter the fictional demo account. |
-| POST | `/auth/logout` | Clear the session cookie. |
+| POST | `/auth/logout` | Revoke issued sessions and clear the cookie. |
 | GET | `/auth/me` | Return the current user. |
 | POST | `/auth/demo/reset` | Replace demo data with the seeded dataset. Demo account only. |
+
+Authentication endpoints are rate-limited per client address. Responses use
+`429` with `Retry-After` when the limit is exceeded. Mutating requests with a
+foreign `Origin` header are rejected with `403`. The session cookie is
+HttpOnly, SameSite=Lax, and Secure when `COOKIE_SECURE=true` or
+`ENVIRONMENT=production`.
 
 ## Reference data and system
 

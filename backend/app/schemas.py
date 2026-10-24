@@ -39,7 +39,6 @@ class UserOut(ORMModel):
 
 class AuthResponse(BaseModel):
     user: UserOut
-    token: str
 
 
 # ---------- Categories ----------

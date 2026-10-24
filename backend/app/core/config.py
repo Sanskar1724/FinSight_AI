@@ -31,6 +31,8 @@ class Settings(BaseSettings):
     cookie_name: str = "finsight_session"
     cookie_secure: bool = False
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
+    auth_rate_limit_attempts: int = 20
+    auth_rate_limit_window_seconds: int = 300
     demo_email: str = "demo@finsight.local"
     demo_password: str = "Demo@12345"
     demo_name: str = "Aarav Mehta"
@@ -58,6 +60,10 @@ class Settings(BaseSettings):
     @property
     def is_postgres(self) -> bool:
         return self.database_url.startswith("postgresql")
+
+    @property
+    def use_secure_cookies(self) -> bool:
+        return self.cookie_secure or self.environment.lower() == "production"
 
 
 @lru_cache

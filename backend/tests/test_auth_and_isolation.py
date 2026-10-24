@@ -4,6 +4,7 @@ from datetime import date
 
 from fastapi.testclient import TestClient
 
+from app.core.config import settings
 from tests.conftest import category_id, create_transaction, signup
 
 
@@ -41,14 +42,69 @@ def test_duplicate_registration_is_rejected(client: TestClient) -> None:
     assert response.status_code == 409
 
 
-def test_bearer_token_is_supported(client: TestClient) -> None:
+def test_auth_response_does_not_expose_token_and_cookie_is_hardened(
+    client: TestClient,
+) -> None:
+    response = client.post(
+        "/api/auth/register",
+        json={"name": "Alice Sharma", "email": "alice@example.com", "password": "StrongPass123"},
+    )
+    assert response.status_code == 201
+    assert "token" not in response.json()
+    cookie = response.headers["set-cookie"].lower()
+    assert "httponly" in cookie
+    assert "samesite=lax" in cookie
+    assert client.cookies.get(settings.cookie_name) is not None
+
+
+def test_logout_revokes_the_issued_session(client: TestClient) -> None:
+    signup(client)
+    old_token = client.cookies.get(settings.cookie_name)
+    assert old_token is not None
+
+    assert client.post("/api/auth/logout").status_code == 200
+    client.cookies.set(settings.cookie_name, old_token)
+    assert client.get("/api/auth/me").status_code == 401
+
+
+def test_auth_rate_limit_blocks_repeated_failures(
+    client: TestClient, monkeypatch
+) -> None:
+    monkeypatch.setattr(settings, "auth_rate_limit_attempts", 2)
+    signup(client)
+    credentials = {"email": "alice@example.com", "password": "wrong-password"}
+    assert client.post("/api/auth/login", json=credentials).status_code == 401
+    assert client.post("/api/auth/login", json=credentials).status_code == 401
+    blocked = client.post("/api/auth/login", json=credentials)
+    assert blocked.status_code == 429
+    assert blocked.headers["Retry-After"] == str(settings.auth_rate_limit_window_seconds)
+
+
+def test_security_headers_and_cross_origin_guard(client: TestClient) -> None:
+    response = client.get("/api/auth/me")
+    assert response.status_code == 401
+    assert response.headers["X-Content-Type-Options"] == "nosniff"
+    assert response.headers["X-Frame-Options"] == "DENY"
+    assert response.headers["Referrer-Policy"] == "no-referrer"
+    assert response.headers["Cache-Control"] == "no-store"
+
+    blocked = client.post(
+        "/api/auth/login",
+        json={"email": "alice@example.com", "password": "StrongPass123"},
+        headers={"Origin": "https://evil.example"},
+    )
+    assert blocked.status_code == 403
+    assert blocked.json()["detail"] == "Cross-origin request rejected"
+
+
+def test_authorization_header_is_not_accepted_without_a_cookie(client: TestClient) -> None:
     auth = signup(client)
-    token = auth["token"]
     client.cookies.clear()
-    response = client.get("/api/auth/me", headers={"Authorization": f"Bearer {token}"})
-    assert response.status_code == 200
-    assert response.json()["email"] == "alice@example.com"
-    assert client.get("/api/auth/me", headers={"Authorization": "Bearer invalid"}).status_code == 401
+    response = client.get(
+        "/api/auth/me",
+        headers={"Authorization": f"Bearer {auth['user']['email']}"},
+    )
+    assert response.status_code == 401
 
 
 def test_two_users_cannot_read_or_mutate_each_others_records(client: TestClient) -> None:
@@ -90,29 +146,27 @@ def test_two_users_cannot_read_or_mutate_each_others_records(client: TestClient)
     assert client.get("/api/goals").json()["items"] == []
 
     client.cookies.clear()
-    response = client.get(
-        f"/api/transactions/{alice_txn_id}",
-        headers={"Authorization": f"Bearer {alice['token']}"},
+    assert (
+        client.post(
+            "/api/auth/login",
+            json={"email": "alice@example.com", "password": "StrongPass123"},
+        ).status_code
+        == 200
     )
+    response = client.get(f"/api/transactions/{alice_txn_id}")
     assert response.status_code == 200
     assert response.json()["merchant"] == "Alice only"
 
 
 def test_user_cannot_read_another_users_ai_or_research_data(client: TestClient) -> None:
-    alice = signup(client, email="alice@example.com", name="Alice Sharma")
-    client.cookies.clear()
+    signup(client, email="alice@example.com", name="Alice Sharma")
     alice_session = client.post(
         "/api/ai/chat",
         json={"message": "How much did I spend this month?"},
-        headers={"Authorization": f"Bearer {alice['token']}"},
     )
     assert alice_session.status_code == 200
     session_id = alice_session.json()["session_id"]
-    run = client.post(
-        "/api/research/runs",
-        json={"limit": 1},
-        headers={"Authorization": f"Bearer {alice['token']}"},
-    )
+    run = client.post("/api/research/runs", json={"limit": 1})
     assert run.status_code == 202
     run_id = run.json()["id"]
 

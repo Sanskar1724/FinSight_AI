@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
+from urllib.parse import urlparse
 from zoneinfo import ZoneInfo
 
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -104,6 +105,39 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+UNSAFE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
+
+
+def _origin_allowed(origin: str, request: Request) -> bool:
+    if origin in settings.cors_origin_list:
+        return True
+    parsed = urlparse(origin)
+    return bool(parsed.netloc) and parsed.netloc == request.url.netloc
+
+
+@app.middleware("http")
+async def security_headers(request: Request, call_next):  # type: ignore[no-untyped-def]
+    if request.method in UNSAFE_METHODS:
+        origin = request.headers.get("origin")
+        if origin and not _origin_allowed(origin, request):
+            return JSONResponse(
+                status_code=403,
+                content={"detail": "Cross-origin request rejected"},
+            )
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "no-referrer")
+    response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+    if request.url.path.startswith(f"{settings.api_prefix}/auth"):
+        response.headers.setdefault("Cache-Control", "no-store")
+    if request.url.scheme == "https":
+        response.headers.setdefault(
+            "Strict-Transport-Security", "max-age=31536000; includeSubDomains"
+        )
+    return response
+
 
 for router in [
     auth.router,

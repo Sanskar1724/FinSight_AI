@@ -25,6 +25,8 @@ ENVIRONMENT=production
 SECRET_KEY=<long-random-secret>
 COOKIE_SECURE=true
 CORS_ORIGINS=https://finance.example.com
+AUTH_RATE_LIMIT_ATTEMPTS=20
+AUTH_RATE_LIMIT_WINDOW_SECONDS=300
 DATABASE_URL=postgresql+psycopg://finsight:<password>@db:5432/finsight
 SEED_DEMO_ON_STARTUP=false
 ENABLE_SCHEDULER=true
@@ -34,7 +36,10 @@ Notes:
 
 - Terminate TLS at the proxy and forward to Uvicorn on loopback.
 - Use a unique, randomly generated `SECRET_KEY`; changing it invalidates existing sessions.
-- Keep `COOKIE_SECURE=true` in HTTPS deployments.
+- Keep `COOKIE_SECURE=true` in HTTPS deployments. Production mode also enables
+  secure cookies automatically.
+- Authentication rate limits are stored in process memory. With multiple
+  workers, use a shared rate-limit store at the proxy or replace the limiter.
 - If frontend and API are separate origins, set `CORS_ORIGINS` exactly and build the frontend with `VITE_API_URL=https://api.example.com/api`. Prefer same-origin or a path-based reverse proxy because the session cookie is SameSite=Lax.
 - The demo account is publicly accessible by design. Disable or restrict it if the application should not expose fictional demo data.
 - No email or SMS delivery exists. Bill reminders and notifications stay in-app.

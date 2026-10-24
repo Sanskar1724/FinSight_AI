@@ -28,6 +28,7 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     name: Mapped[str] = mapped_column(String(120))
     password_hash: Mapped[str] = mapped_column(String(512))
+    token_version: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     is_demo: Mapped[bool] = mapped_column(Boolean, default=False)
     timezone: Mapped[str] = mapped_column(String(64), default="Asia/Kolkata")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)

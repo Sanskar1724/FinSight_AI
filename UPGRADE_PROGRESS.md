@@ -16,7 +16,7 @@ tested, committed, and pushed separately.
 | Upgrade | Scope | Status |
 | --- | --- | --- |
 | 1 | Scenario baseline correctness | Complete |
-| 2 | Authentication and session security | Planned |
+| 2 | Authentication and session security | Complete |
 | 3 | Notification lifecycle and links | Planned |
 | 4 | AI intent, history, and reliability | Planned |
 | 5 | Frontend navigation, state, and accessibility | Planned |
@@ -76,13 +76,58 @@ are excluded and disclosed in the response assumptions.
 
 ## Upgrade 2 - Authentication and session security
 
-**Status:** Planned.
+**Status:** Complete and pushed.
 
-Planned scope: replace client-readable bearer-token exposure with a safer
-session flow where practical, add token revocation/logout invalidation, tighten
-cookie and CSRF behavior, add authentication rate limiting, and add security
-headers. Tests must cover revoked sessions, cross-user isolation, CSRF
-behavior, and rate-limit responses.
+**Problem:** Authentication responses exposed a reusable JWT in JSON, logout
+only cleared the browser cookie without invalidating the token, bearer tokens
+were accepted independently of the cookie, and authentication endpoints had no
+abuse limit.
+
+**Implementation:**
+
+- Removed the token from `AuthResponse`; sessions are cookie-only.
+- Added `users.token_version` and a migration. JWTs now carry `ver`, and
+  logout increments the version so previously issued sessions are rejected.
+- Removed the bearer-header fallback from authentication.
+- Added per-client in-process rate limiting for register, login, and demo login
+  with `429` and `Retry-After` responses.
+- Added an Origin guard for unsafe methods, security headers, `no-store` on
+  auth responses, and secure-cookie behavior in production.
+- Updated API/architecture/deployment docs and frontend auth types.
+- Added tests for token non-exposure, cookie hardening, logout revocation,
+  bearer rejection, rate limits, security headers, cross-origin rejection, and
+  cross-user isolation.
+
+**Verification:**
+
+- `pytest -q`: 58 passed, 1 existing Starlette/httpx deprecation warning.
+- `npm run typecheck`: passed.
+- Alembic upgrade on a fresh SQLite database reached `9b1d2f4a7c10` and added
+  `users.token_version`.
+
+**Files changed:**
+
+- `backend/app/api/deps.py`
+- `backend/app/api/routes/auth.py`
+- `backend/app/core/config.py`
+- `backend/app/core/rate_limit.py`
+- `backend/app/core/security.py`
+- `backend/app/main.py`
+- `backend/app/models.py`
+- `backend/app/schemas.py`
+- `backend/alembic/versions/9b1d2f4a7c10_add_user_token_version.py`
+- `backend/tests/conftest.py`
+- `backend/tests/test_auth_and_isolation.py`
+- `backend/tests/test_ai_research.py`
+- `frontend/src/lib/types.ts`
+- `backend/.env.example`
+- `docs/API.md`
+- `docs/ARCHITECTURE.md`
+- `docs/DEPLOYMENT.md`
+
+**Known limitation:** Rate limiting is process-local. Multi-worker deployments
+need a shared store or proxy-level limiting. Logout revokes all sessions for the
+user rather than only the current device.
 
 ## Upgrade 3 - Notification lifecycle and links
 

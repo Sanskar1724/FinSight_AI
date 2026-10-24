@@ -41,11 +41,12 @@ def verify_password(password: str, encoded: str) -> bool:
         return False
 
 
-def create_access_token(user_id: int, email: str) -> str:
+def create_access_token(user_id: int, email: str, token_version: int = 0) -> str:
     now = datetime.now(timezone.utc)
     payload = {
         "sub": str(user_id),
         "email": email,
+        "ver": token_version,
         "iat": int(now.timestamp()),
         "exp": int((now + timedelta(minutes=settings.access_token_expire_minutes)).timestamp()),
         "iss": "finsight-ai",
@@ -59,5 +60,5 @@ def decode_access_token(token: str) -> dict:
         settings.secret_key,
         algorithms=[ALGORITHM],
         issuer="finsight-ai",
-        options={"require": ["exp", "sub", "iat"]},
+        options={"require": ["exp", "sub", "iat", "ver"]},
     )

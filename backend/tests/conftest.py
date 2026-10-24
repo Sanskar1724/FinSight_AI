@@ -8,6 +8,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from app.core.rate_limit import auth_rate_limiter
 from app.db.base import Base, get_db
 from app.main import app
 from app.seed import seed_reference_data
@@ -20,6 +21,13 @@ TEST_ENGINE = create_engine(
 TestingSession = sessionmaker(
     bind=TEST_ENGINE, autoflush=False, autocommit=False, expire_on_commit=False
 )
+
+
+@pytest.fixture(autouse=True)
+def reset_auth_rate_limiter() -> Iterator[None]:
+    auth_rate_limiter.reset()
+    yield
+    auth_rate_limiter.reset()
 
 
 @pytest.fixture(autouse=True)
