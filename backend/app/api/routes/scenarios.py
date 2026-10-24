@@ -17,8 +17,8 @@ from app.schemas import (
     ScenarioResponse,
 )
 from app.services import finance
-from app.services.finance import q, simulate_scenario
-from app.services.ledger import category_map, dec, goals_for_user, txns_between
+from app.services.finance import average_monthly_baseline, q, simulate_scenario
+from app.services.ledger import category_map, goals_for_user, txns_between, txns_like
 
 router = APIRouter(prefix="/scenarios", tags=["scenarios"])
 
@@ -34,28 +34,22 @@ def simulate(
     start = finance.add_months(current_month, -3)
     _, end = finance.month_bounds(finance.add_months(current_month, -1))
     baseline_txns = txns_between(db, user.id, start, end) if start <= end else []
+    baseline = average_monthly_baseline(txns_like(baseline_txns), start, end)
     used_partial_month = False
-    if not baseline_txns:
+    if baseline.months_used == 0:
         baseline_txns = txns_between(db, user.id, current_month, today)
+        baseline = average_monthly_baseline(
+            txns_like(baseline_txns), current_month, today
+        )
         used_partial_month = True
+
     categories = category_map(db)
-    category_spend: dict[int, Decimal] = {}
-    category_names: dict[int, str] = {}
-    income_total = Decimal("0")
-    for txn in baseline_txns:
-        amount = dec(txn.amount)
-        if txn.type == "expense":
-            category_spend[txn.category_id] = category_spend.get(txn.category_id, q(0)) + amount
-            category_names[txn.category_id] = (
-                categories[txn.category_id].name
-                if txn.category_id in categories
-                else "Unknown"
-            )
-        else:
-            income_total += amount
-    divisor = Decimal("1") if used_partial_month else Decimal("3")
-    category_spend = {key: q(value / divisor) for key, value in category_spend.items()}
-    baseline_income = q(income_total / divisor)
+    category_names = {
+        category_id: categories[category_id].name
+        if category_id in categories
+        else "Unknown"
+        for category_id in baseline.category_spend
+    }
 
     reductions: dict[int, float] = {}
     for item in payload.category_reductions:
@@ -68,9 +62,9 @@ def simulate(
 
     shopping_category = db.scalar(select(Category).where(Category.slug == "shopping"))
     result = simulate_scenario(
-        baseline_category_spend=category_spend,
+        baseline_category_spend=baseline.category_spend,
         category_names=category_names,
-        baseline_income=baseline_income,
+        baseline_income=baseline.income,
         category_reductions=reductions,
         shopping_category_id=shopping_category.id if shopping_category else None,
         shopping_reduction_amount=q(payload.shopping_reduction_amount),
@@ -116,14 +110,27 @@ def simulate(
 
     assumptions = list(result.assumptions)
     if used_partial_month:
-        assumptions.insert(
-            0,
-            "No complete three-month history was available, so the current partial month is used as the baseline.",
-        )
+        if baseline.months_used:
+            assumptions.insert(
+                0,
+                "No complete month with recorded transactions was available, so the current partial month is used as the baseline.",
+            )
+        else:
+            assumptions.insert(
+                0,
+                "No transactions were recorded in the three-month baseline window or the current month, so baseline values are zero.",
+            )
     else:
+        month_word = "month" if baseline.months_used == 1 else "months"
+        month_labels = ", ".join(
+            finance.month_label(month) for month in baseline.months
+        )
         assumptions.insert(
             0,
-            "Baseline category spending and income are averages of the last three complete calendar months.",
+            f"Baseline uses {baseline.months_used} complete {month_word} with recorded "
+            f"transactions ({month_labels}). Months with no recorded transactions, "
+            "including months before your first record, are excluded and not treated as zero. "
+            "The app cannot infer whether those months had no activity or missing records.",
         )
 
     return ScenarioResponse(

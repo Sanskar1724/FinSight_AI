@@ -4,7 +4,7 @@ from datetime import date, timedelta
 
 from fastapi.testclient import TestClient
 
-from app.services.finance import add_months
+from app.services.finance import add_months, month_bounds
 from tests.conftest import category_id, create_transaction, signup
 
 
@@ -212,6 +212,109 @@ def test_scenario_calculation_and_goal_projection(client: TestClient) -> None:
         json={"category_reductions": [{"category_id": 999999, "reduction_percent": 10}]},
     )
     assert bad_category.status_code == 422
+
+
+def test_scenario_baseline_uses_one_observed_month_at_range_boundaries(
+    client: TestClient,
+) -> None:
+    signup(client)
+    previous = add_months(current_month(), -1)
+    _, previous_end = month_bounds(previous)
+    for amount, occurred_on in (
+        ("10000.00", previous.isoformat()),
+        ("20000.00", previous_end.isoformat()),
+        ("9000.00", date.today().isoformat()),
+    ):
+        response = create_transaction(
+            client,
+            amount=amount,
+            occurred_on=occurred_on,
+            merchant="Food place",
+        )
+        assert response.status_code == 201
+    response = create_transaction(
+        client,
+        slug="salary",
+        txn_type="income",
+        amount="30000.00",
+        occurred_on=previous_end.isoformat(),
+        merchant="Employer",
+    )
+    assert response.status_code == 201
+
+    response = client.post("/api/scenarios/simulate", json={"months": 6})
+
+    assert response.status_code == 200, response.text
+    result = response.json()
+    assert result["baseline_monthly_expenses"] == 30000.0
+    assert result["baseline_monthly_income"] == 30000.0
+    assert "1 complete month with recorded transactions" in result["assumptions"][0]
+    assert "not treated as zero" in result["assumptions"][0]
+
+
+def test_scenario_baseline_excludes_months_without_records(client: TestClient) -> None:
+    signup(client)
+    for month_offset, amount in ((-3, "10000.00"), (-1, "20000.00")):
+        month = add_months(current_month(), month_offset)
+        response = create_transaction(
+            client,
+            amount=amount,
+            occurred_on=date(month.year, month.month, 10).isoformat(),
+            merchant="Food place",
+        )
+        assert response.status_code == 201
+
+    response = client.post("/api/scenarios/simulate", json={"months": 6})
+
+    assert response.status_code == 200, response.text
+    result = response.json()
+    assert result["baseline_monthly_expenses"] == 15000.0
+    assert "2 complete months with recorded transactions" in result["assumptions"][0]
+
+
+def test_scenario_baseline_is_zero_without_records(client: TestClient) -> None:
+    signup(client)
+
+    response = client.post("/api/scenarios/simulate", json={"months": 6})
+
+    assert response.status_code == 200, response.text
+    result = response.json()
+    assert result["baseline_monthly_expenses"] == 0.0
+    assert result["baseline_monthly_income"] == 0.0
+    assert "No transactions were recorded" in result["assumptions"][0]
+
+
+def test_ai_scenario_uses_same_observed_month_baseline(client: TestClient) -> None:
+    signup(client)
+    previous = add_months(current_month(), -1)
+    for amount, occurred_on in (
+        ("30000.00", date(previous.year, previous.month, 10).isoformat()),
+        ("9000.00", date.today().isoformat()),
+    ):
+        response = create_transaction(
+            client,
+            amount=amount,
+            occurred_on=occurred_on,
+            merchant="Food place",
+        )
+        assert response.status_code == 201
+
+    response = client.post(
+        "/api/ai/chat",
+        json={
+            "message": "If I cut Food & Dining spending by 10%, how much could I save over six months?"
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert "1 observed month" in body["answer"]
+    assert "three-month average" not in body["answer"]
+    assert "\u20b93,000.00" in body["answer"]
+    assert "\u20b918,000.00" in body["answer"]
+    scenario = next(item for item in body["evidence"] if item["id"] == "scenario")
+    assert "1 observed month" in scenario["value"]
+    assert "\u20b930,000.00" in scenario["value"]
 
 
 def test_bills_crud_and_upcoming_reminder(client: TestClient) -> None:

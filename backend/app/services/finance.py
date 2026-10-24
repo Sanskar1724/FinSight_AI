@@ -130,6 +130,55 @@ class TxnLike:
     merchant: str
 
 
+@dataclass(frozen=True)
+class MonthlyBaseline:
+    category_spend: dict[int, Decimal]
+    income: Decimal
+    months: tuple[date, ...]
+
+    @property
+    def months_used(self) -> int:
+        return len(self.months)
+
+
+def average_monthly_baseline(
+    transactions: Sequence[TxnLike], start: date, end: date
+) -> MonthlyBaseline:
+    """Average category spend and income across observed months.
+
+    A month is observed when it contains at least one transaction. Months with
+    no transactions are excluded rather than treated as zero because the ledger
+    cannot distinguish missing records from months with no spending. Within an
+    observed month, a category without spending contributes zero because the
+    denominator is the number of observed months.
+    """
+    in_range = [txn for txn in transactions if start <= txn.occurred_on <= end]
+    months = sorted(
+        {date(txn.occurred_on.year, txn.occurred_on.month, 1) for txn in in_range}
+    )
+    if not months:
+        return MonthlyBaseline(category_spend={}, income=ZERO, months=())
+
+    category_totals: dict[int, Decimal] = defaultdict(lambda: ZERO)
+    income_total = ZERO
+    for txn in in_range:
+        amount = q(txn.amount)
+        if txn.type == "expense":
+            category_totals[txn.category_id] += amount
+        elif txn.type == "income":
+            income_total += amount
+
+    divisor = Decimal(len(months))
+    return MonthlyBaseline(
+        category_spend={
+            category_id: q(total / divisor)
+            for category_id, total in category_totals.items()
+        },
+        income=q(income_total / divisor),
+        months=tuple(months),
+    )
+
+
 @dataclass
 class CashFlow:
     income: Decimal
@@ -857,7 +906,7 @@ def simulate_scenario(
     additional = q(additional_monthly_savings)
     projected = q(monthly_savings * months - one_time_expense + additional * months)
     assumptions = [
-        "Baseline spending is the average of up to three complete months by category.",
+        "Baseline spending is the average of the observed baseline months by category.",
         "Reductions apply to that baseline and cannot make a category negative.",
         "Income change is treated as a recurring monthly change; the one-time expense is not.",
         "Additional monthly savings is a transfer, so it adds to projected savings without changing cash-flow net.",

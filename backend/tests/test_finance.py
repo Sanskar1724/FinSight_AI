@@ -5,6 +5,7 @@ from decimal import Decimal
 
 from app.services.finance import (
     TxnLike,
+    average_monthly_baseline,
     backtest_rolling_average,
     budget_risk,
     budget_status,
@@ -210,3 +211,45 @@ def test_scenario_reductions_cannot_make_category_negative() -> None:
     shopping = next(item for item in result.category_changes if item["category_id"] == 2)
     assert shopping["adjusted"] == Decimal("0.00")
     assert shopping["savings"] == Decimal("500.00")
+
+
+def test_average_monthly_baseline_uses_one_observed_month_and_range_boundaries() -> None:
+    rows = [
+        txn(1, "10000", date(2026, 8, 1), category=1),
+        txn(2, "20000", date(2026, 8, 31), category=1),
+        txn(3, "30000", date(2026, 8, 15), category=3, txn_type="income"),
+        txn(4, "9999", date(2026, 9, 1), category=1),
+    ]
+
+    result = average_monthly_baseline(rows, date(2026, 8, 1), date(2026, 8, 31))
+
+    assert result.months_used == 1
+    assert result.category_spend == {1: Decimal("30000.00")}
+    assert result.income == Decimal("30000.00")
+
+
+def test_average_monthly_baseline_excludes_months_without_records() -> None:
+    rows = [
+        txn(1, "10000", date(2026, 7, 15), category=1),
+        txn(2, "20000", date(2026, 9, 15), category=1),
+        txn(3, "12000", date(2026, 9, 20), category=3, txn_type="income"),
+        txn(4, "10000", date(2026, 7, 20), category=2),
+    ]
+
+    result = average_monthly_baseline(rows, date(2026, 7, 1), date(2026, 9, 30))
+
+    assert result.months_used == 2
+    assert [month.month for month in result.months] == [7, 9]
+    assert result.category_spend == {
+        1: Decimal("15000.00"),
+        2: Decimal("5000.00"),
+    }
+    assert result.income == Decimal("6000.00")
+
+
+def test_average_monthly_baseline_is_zero_without_records() -> None:
+    result = average_monthly_baseline([], date(2026, 7, 1), date(2026, 9, 30))
+
+    assert result.months_used == 0
+    assert result.category_spend == {}
+    assert result.income == Decimal("0.00")

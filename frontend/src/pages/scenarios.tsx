@@ -201,7 +201,7 @@ export default function ScenariosPage() {
               </span>
               <div>
                 <CardTitle>Build your scenario</CardTitle>
-                <CardDescription>Baseline = last three complete months</CardDescription>
+                <CardDescription>Baseline = complete months with recorded activity</CardDescription>
               </div>
             </div>
           </CardHeader>
@@ -604,7 +604,7 @@ export default function ScenariosPage() {
           {
             icon: Wallet,
             title: "Baseline is historical",
-            body: "Averages use your last three complete months, not this partial month unless there is no history.",
+            body: "Averages use up to three complete months with recorded transactions. Months without records are excluded, not treated as zero. The current partial month is used only when no complete month has records.",
           },
           {
             icon: TrendingUp,

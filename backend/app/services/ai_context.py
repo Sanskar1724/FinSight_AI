@@ -643,16 +643,25 @@ def build_context(db: Session, user: User, question: str, today: date | None = N
             start_month = finance.add_months(month_start, -3)
             _, end_prev = finance.month_bounds(finance.add_months(month_start, -1))
             base_txns = txns_between(db, user.id, start_month, end_prev)
-            monthly_total = sum(
-                (
-                    dec(txn.amount)
-                    for txn in base_txns
-                    if txn.type == "expense" and txn.category_id == chosen.id
-                ),
-                finance.ZERO,
-            ) / Decimal(3)
+            baseline = finance.average_monthly_baseline(
+                txns_like(base_txns), start_month, end_prev
+            )
+            used_partial_month = False
+            if baseline.months_used == 0:
+                base_txns = txns_between(db, user.id, month_start, today)
+                baseline = finance.average_monthly_baseline(
+                    txns_like(base_txns), month_start, today
+                )
+                used_partial_month = True
+            monthly_total = baseline.category_spend.get(chosen.id, finance.ZERO)
             monthly_saving = finance.q(monthly_total * percent / Decimal(100))
             total_saving = finance.q(monthly_saving * Decimal(months))
+            baseline_label = (
+                "current partial month"
+                if used_partial_month
+                else f"{baseline.months_used} observed month"
+                f"{'' if baseline.months_used == 1 else 's'}"
+            )
             context.scenario = {
                 "category": chosen.name,
                 "percent": float(percent),
@@ -660,6 +669,9 @@ def build_context(db: Session, user: User, question: str, today: date | None = N
                 "baseline_monthly_spend": format_inr(monthly_total),
                 "monthly_saving": format_inr(monthly_saving),
                 "total_saving": format_inr(total_saving),
+                "baseline_label": baseline_label,
+                "months_used": baseline.months_used,
+                "uses_partial_month": used_partial_month,
             }
             facts["hypothetical_scenario"] = {
                 **context.scenario,
@@ -671,11 +683,11 @@ def build_context(db: Session, user: User, question: str, today: date | None = N
                     "id": "scenario",
                     "label": "Hypothetical category reduction",
                     "value": (
-                        f"Reduce {chosen.name} by {percent}% from a 3-month average of "
-                        f"{format_inr(monthly_total)}/month for {months} months = "
-                        f"{format_inr(total_saving)}"
+                        f"Reduce {chosen.name} by {percent}% from a {baseline_label} "
+                        f"baseline of {format_inr(monthly_total)}/month for {months} "
+                        f"months = {format_inr(total_saving)}"
                     ),
-                    "source": "Deterministic scenario arithmetic on complete months",
+                    "source": "Deterministic scenario arithmetic on observed months",
                     "route": "/analytics?tab=scenarios",
                 },
             )

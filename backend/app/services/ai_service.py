@@ -452,7 +452,8 @@ def deterministic_answer(context: AIContext) -> str:
         scenario = facts.get("hypothetical_scenario", {})
         return (
             f"Hypothetical scenario: reducing {scenario.get('category', 'the category')} spending by "
-            f"{scenario.get('percent', 0):g}% from a three-month average of "
+            f"{scenario.get('percent', 0):g}% from a "
+            f"{scenario.get('baseline_label', 'observed-month')} baseline of "
             f"{scenario.get('baseline_monthly_spend', '₹0.00')} per month saves about "
             f"{scenario.get('monthly_saving', '₹0.00')} per month, or "
             f"{scenario.get('total_saving', '₹0.00')} over {scenario.get('months', 0)} months. "
