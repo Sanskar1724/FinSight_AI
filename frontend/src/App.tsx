@@ -16,11 +16,13 @@ const LoginPage = lazy(() => import("@/pages/login"));
 const NotFoundPage = lazy(() => import("@/pages/not-found"));
 const NotificationsPage = lazy(() => import("@/pages/notifications"));
 const OverviewPage = lazy(() => import("@/pages/overview"));
+const PrivacyPage = lazy(() => import("@/pages/privacy"));
 const RegisterPage = lazy(() => import("@/pages/register"));
 const ResearchPage = lazy(() => import("@/pages/research"));
 const ResetPasswordPage = lazy(() => import("@/pages/reset-password"));
 const ScenariosPage = lazy(() => import("@/pages/scenarios"));
 const SettingsPage = lazy(() => import("@/pages/settings"));
+const TermsPage = lazy(() => import("@/pages/terms"));
 const TransactionsPage = lazy(() => import("@/pages/transactions"));
 
 const titles: Record<string, string> = {
@@ -28,6 +30,8 @@ const titles: Record<string, string> = {
   "/login": "Sign in — FinSight AI",
   "/register": "Create your account — FinSight AI",
   "/forgot-password": "Reset your password — FinSight AI",
+  "/privacy": "Privacy Policy — FinSight AI",
+  "/terms": "Terms of Service — FinSight AI",
   "/reset-password": "Choose a new password — FinSight AI",
   "/app": "Overview — FinSight AI",
   "/app/transactions": "Transactions — FinSight AI",
@@ -97,6 +101,22 @@ export default function App() {
             }
           />
         </Route>
+        <Route
+          path="/privacy"
+          element={
+            <PageSuspense>
+              <PrivacyPage />
+            </PageSuspense>
+          }
+        />
+        <Route
+          path="/terms"
+          element={
+            <PageSuspense>
+              <TermsPage />
+            </PageSuspense>
+          }
+        />
         <Route
           path="/reset-password"
           element={

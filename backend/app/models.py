@@ -30,6 +30,8 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(String(512))
     token_version: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     is_demo: Mapped[bool] = mapped_column(Boolean, default=False)
+    # When the user accepted the Terms and Privacy Policy at sign-up.
+    terms_accepted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     timezone: Mapped[str] = mapped_column(String(64), default="Asia/Kolkata")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 

@@ -21,6 +21,14 @@ class RegisterRequest(BaseModel):
     name: str = Field(min_length=2, max_length=120)
     email: str = Field(min_length=5, max_length=255, pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
     password: str = Field(min_length=8, max_length=128)
+    accept_terms: bool
+
+    @field_validator("accept_terms")
+    @classmethod
+    def terms_must_be_accepted(cls, value: bool) -> bool:
+        if not value:
+            raise ValueError("You must accept the Terms of Service and Privacy Policy")
+        return value
 
 
 class LoginRequest(BaseModel):
@@ -729,6 +737,11 @@ class ResearchExport(BaseModel):
 # ---------- Misc ----------
 class MessageResponse(BaseModel):
     message: str
+
+
+class PublicConfig(BaseModel):
+    support_email: str | None
+    demo_enabled: bool
 
 
 class HealthResponse(BaseModel):

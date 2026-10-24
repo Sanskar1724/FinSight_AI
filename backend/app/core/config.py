@@ -53,6 +53,8 @@ class Settings(BaseSettings):
     max_upload_bytes: int = 2_000_000
     # Public URL of the web app, used in links inside emails.
     public_app_url: str = "http://localhost:5173"
+    # Contact shown on the Privacy Policy and Terms pages for data requests.
+    support_email: str = ""
     # Outgoing email (password reset). When SMTP_HOST is empty, emails are
     # written to the log instead of being sent, which suits local development.
     smtp_host: str = ""

@@ -595,6 +595,12 @@ export default function LandingPage() {
             <a href="#privacy" className="hover:text-foreground">
               Privacy
             </a>
+            <Link to="/privacy" className="hover:text-foreground">
+              Privacy Policy
+            </Link>
+            <Link to="/terms" className="hover:text-foreground">
+              Terms
+            </Link>
             <Link to="/login" className="hover:text-foreground">
               Sign in
             </Link>

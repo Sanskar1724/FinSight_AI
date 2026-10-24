@@ -22,6 +22,9 @@ const schema = z
       .min(8, "Use at least 8 characters")
       .max(128, "Use 128 characters or fewer"),
     confirmPassword: z.string().min(1, "Confirm your password"),
+    acceptTerms: z.boolean().refine((value) => value, {
+      message: "Please accept the Terms of Service and Privacy Policy",
+    }),
   })
   .refine((values) => values.password === values.confirmPassword, {
     path: ["confirmPassword"],
@@ -37,7 +40,7 @@ export default function RegisterPage() {
 
   const form = useForm<RegisterValues>({
     resolver: zodResolver(schema),
-    defaultValues: { name: "", email: "", password: "", confirmPassword: "" },
+    defaultValues: { name: "", email: "", password: "", confirmPassword: "", acceptTerms: false },
   });
 
   const submit = form.handleSubmit(async (values) => {
@@ -106,6 +109,33 @@ export default function RegisterPage() {
             error={form.formState.errors.confirmPassword?.message}
             {...form.register("confirmPassword")}
           />
+
+          <div>
+            <label className="flex cursor-pointer items-start gap-2.5 text-xs leading-relaxed text-muted-foreground">
+              <input
+                type="checkbox"
+                className="mt-0.5 size-4 shrink-0 cursor-pointer rounded border-input accent-[hsl(var(--primary))]"
+                aria-invalid={Boolean(form.formState.errors.acceptTerms)}
+                {...form.register("acceptTerms")}
+              />
+              <span>
+                I&apos;m 18 or older and I agree to the{" "}
+                <Link to="/terms" target="_blank" className="font-semibold text-primary hover:underline">
+                  Terms of Service
+                </Link>{" "}
+                and{" "}
+                <Link to="/privacy" target="_blank" className="font-semibold text-primary hover:underline">
+                  Privacy Policy
+                </Link>
+                .
+              </span>
+            </label>
+            {form.formState.errors.acceptTerms?.message && (
+              <p className="mt-1.5 text-[11px] font-medium text-rose-600">
+                {form.formState.errors.acceptTerms.message}
+              </p>
+            )}
+          </div>
 
           {form.formState.errors.root?.message && (
             <p className="rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-2.5 text-xs font-medium text-rose-700">

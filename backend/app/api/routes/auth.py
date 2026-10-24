@@ -68,6 +68,7 @@ def register(
         email=email,
         password_hash=hash_password(payload.password),
         timezone=settings.timezone,
+        terms_accepted_at=utcnow(),
     )
     db.add(user)
     db.flush()

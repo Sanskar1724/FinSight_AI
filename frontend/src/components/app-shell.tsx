@@ -244,10 +244,18 @@ export function AppShell() {
         </main>
         <footer className="mx-auto flex w-full max-w-[1440px] flex-col gap-2 px-4 pb-6 text-[11px] text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
           <p>FinSight is a planning tool, not a bank or financial adviser.</p>
-          <p className="inline-flex items-center gap-1.5">
-            <span className="size-1.5 rounded-full bg-emerald-500" />
-            Your records stay in your own FinSight workspace
-          </p>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+            <Link to="/privacy" className="hover:text-foreground">
+              Privacy
+            </Link>
+            <Link to="/terms" className="hover:text-foreground">
+              Terms
+            </Link>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="size-1.5 rounded-full bg-emerald-500" />
+              Your records stay in your own FinSight workspace
+            </span>
+          </div>
         </footer>
       </div>
     </div>

@@ -18,7 +18,7 @@ Interactive, authoritative documentation is available at `/api/docs` (Swagger UI
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| POST | `/auth/register` | Create an account and session. |
+| POST | `/auth/register` | Create an account and session. Requires `accept_terms: true`; the consent time is stored. |
 | POST | `/auth/login` | Sign in. |
 | POST | `/auth/demo` | Create/repair and enter the fictional demo account. |
 | POST | `/auth/logout` | Revoke issued sessions and clear the cookie. |
@@ -43,6 +43,7 @@ HttpOnly, SameSite=Lax, and Secure when `COOKIE_SECURE=true` or
 | GET | `/health` | Database, AI, and version readiness. |
 | GET | `/` | API identity, version, and disclaimer. |
 | GET | `/categories` | Seeded income/expense categories. |
+| GET | `/public-config` | Non-secret runtime settings for the web app: support contact and whether the demo is enabled. |
 
 ## Ledger
 

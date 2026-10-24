@@ -5,8 +5,9 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app import __version__
+from app.core.config import settings
 from app.db.base import get_db
-from app.schemas import HealthResponse
+from app.schemas import HealthResponse, PublicConfig
 from app.services.ai_service import ai_status
 
 router = APIRouter(tags=["system"])
@@ -22,6 +23,15 @@ def health(db: Session = Depends(get_db)) -> HealthResponse:
         ai_provider=ai["provider"],
         ai_configured=ai["configured"],
         version=__version__,
+    )
+
+
+@router.get("/public-config", response_model=PublicConfig)
+def public_config() -> PublicConfig:
+    """Non-secret settings the web app needs at runtime (no rebuild to change)."""
+    return PublicConfig(
+        support_email=settings.support_email.strip() or None,
+        demo_enabled=settings.seed_demo_on_startup,
     )
 
 

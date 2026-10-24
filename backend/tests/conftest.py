@@ -76,7 +76,7 @@ def signup(
 ) -> dict:
     response = client.post(
         "/api/auth/register",
-        json={"name": name, "email": email, "password": password},
+        json={"name": name, "email": email, "password": password, "accept_terms": True},
     )
     assert response.status_code == 201, response.text
     return response.json()

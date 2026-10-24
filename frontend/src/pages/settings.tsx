@@ -19,7 +19,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
 import { ChangePasswordCard, DeleteAccountCard } from "@/components/account-security";
@@ -660,11 +660,14 @@ export default function SettingsPage() {
                   </p>
                 </div>
                 <div className="border-t border-border/60 pt-4">
-                  <p className="text-xs font-semibold">Local-first by default</p>
+                  <p className="text-xs font-semibold">Where it lives</p>
                   <p className="mt-1 text-[10px] leading-relaxed text-muted-foreground">
-                    This deployment uses a SQLite database on the server. If you configure a
-                    hosted AI provider, only the calculated context needed for an answer is sent to
-                    that provider.
+                    Your records are stored in this deployment&apos;s database and are only visible
+                    to your account. The AI assistant runs on the server; if a hosted AI provider is
+                    ever enabled, only the calculated figures needed for an answer are sent to it.{" "}
+                    <Link to="/privacy" className="font-semibold text-primary hover:underline">
+                      Privacy Policy
+                    </Link>
                   </p>
                 </div>
               </CardContent>

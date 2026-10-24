@@ -51,6 +51,8 @@ export function AuthProvider({ children }: PropsWithChildren) {
         name,
         email,
         password,
+        // The sign-up form only submits after the consent checkbox is ticked.
+        accept_terms: true,
       });
       return applyAuth(response);
     },

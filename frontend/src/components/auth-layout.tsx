@@ -27,8 +27,14 @@ export function AuthLayout({ children }: PropsWithChildren) {
         <div className="flex flex-1 items-center justify-center px-5 py-8 sm:px-10">
           <div className="w-full max-w-[420px] animate-fade-up">{children}</div>
         </div>
-        <footer className="px-6 pb-6 text-center text-[11px] text-muted-foreground sm:px-10">
-          Fictional demo data. No bank connection required.
+        <footer className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 px-6 pb-6 text-[11px] text-muted-foreground sm:px-10">
+          <span>No bank connection required.</span>
+          <Link to="/privacy" className="hover:text-foreground">
+            Privacy
+          </Link>
+          <Link to="/terms" className="hover:text-foreground">
+            Terms
+          </Link>
         </footer>
       </div>
 

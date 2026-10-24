@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from datetime import date
 
+import pytest
+
 from fastapi.testclient import TestClient
 
 from app.core.config import settings
@@ -37,7 +39,12 @@ def test_duplicate_registration_is_rejected(client: TestClient) -> None:
     signup(client)
     response = client.post(
         "/api/auth/register",
-        json={"name": "Other Alice", "email": "ALICE@example.com", "password": "StrongPass123"},
+        json={
+            "name": "Other Alice",
+            "email": "ALICE@example.com",
+            "password": "StrongPass123",
+            "accept_terms": True,
+        },
     )
     assert response.status_code == 409
 
@@ -47,7 +54,12 @@ def test_auth_response_does_not_expose_token_and_cookie_is_hardened(
 ) -> None:
     response = client.post(
         "/api/auth/register",
-        json={"name": "Alice Sharma", "email": "alice@example.com", "password": "StrongPass123"},
+        json={
+            "name": "Alice Sharma",
+            "email": "alice@example.com",
+            "password": "StrongPass123",
+            "accept_terms": True,
+        },
     )
     assert response.status_code == 201
     assert "token" not in response.json()
@@ -227,3 +239,29 @@ def test_session_probe_returns_null_user_when_signed_out(client: TestClient) -> 
 
     client.post("/api/auth/logout")
     assert client.get("/api/auth/session").json() == {"user": None}
+
+
+def test_registration_requires_and_records_consent(client: TestClient) -> None:
+    from sqlalchemy import select
+
+    from app.models import User
+    from tests.conftest import TestingSession
+
+    payload = {"name": "No Consent", "email": "nc@example.com", "password": "StrongPass123"}
+    assert client.post("/api/auth/register", json=payload).status_code == 422
+    assert (
+        client.post("/api/auth/register", json={**payload, "accept_terms": False}).status_code
+        == 422
+    )
+    assert client.post("/api/auth/register", json={**payload, "accept_terms": True}).status_code == 201
+    with TestingSession() as db:
+        user = db.scalar(select(User).where(User.email == "nc@example.com"))
+        assert user is not None and user.terms_accepted_at is not None
+
+
+def test_public_config_exposes_only_support_contact(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    assert client.get("/api/public-config").json() == {"support_email": None, "demo_enabled": True}
+    monkeypatch.setattr(settings, "support_email", " help@example.com ")
+    assert client.get("/api/public-config").json()["support_email"] == "help@example.com"

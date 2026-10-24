@@ -165,7 +165,7 @@ def test_research_validation_and_empty_data(client: TestClient) -> None:
 def test_ai_session_can_be_deleted(client: TestClient) -> None:
     signup = client.post(
         "/api/auth/register",
-        json={"name": "Test User", "email": "test.ai@example.com", "password": "StrongPass123"},
+        json={"name": "Test User", "email": "test.ai@example.com", "password": "StrongPass123", "accept_terms": True},
     )
     assert signup.status_code == 201
     chat = client.post("/api/ai/chat", json={"message": "Where is my money going?"})
