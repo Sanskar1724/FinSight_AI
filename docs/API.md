@@ -27,6 +27,8 @@ Interactive, authoritative documentation is available at `/api/docs` (Swagger UI
 | POST | `/auth/demo/reset` | Replace demo data with the seeded dataset. Demo account only. |
 | POST | `/auth/forgot-password` | Email a single-use reset link (30 min). Always returns 200 so registered emails can't be discovered. |
 | POST | `/auth/reset-password` | Set a new password with a reset token; signs out every existing session. |
+| POST | `/auth/change-password` | Change the password (current one required); keeps this session and signs out other devices. |
+| POST | `/auth/delete-account` | Permanently delete the account and all of its data (password required). Not available to the demo account. |
 
 Authentication endpoints are rate-limited per client address. Responses use
 `429` with `Retry-After` when the limit is exceeded. Mutating requests with a

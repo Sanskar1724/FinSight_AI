@@ -21,6 +21,8 @@ from app.db.base import get_db, utcnow
 from app.models import NotificationPreference, PasswordResetToken, User
 from app.schemas import (
     AuthResponse,
+    ChangePasswordRequest,
+    DeleteAccountRequest,
     ForgotPasswordRequest,
     LoginRequest,
     MessageResponse,
@@ -206,3 +208,57 @@ def reset_password(
     )
     db.commit()
     return MessageResponse(message="Password updated. Sign in with your new password.")
+
+
+def _reject_demo(user: User, action: str) -> None:
+    if user.is_demo:
+        raise HTTPException(
+            status_code=403,
+            detail=f"The shared demo account can't {action}. Create your own account to do this.",
+        )
+
+
+@router.post("/change-password", response_model=AuthResponse)
+def change_password(
+    payload: ChangePasswordRequest,
+    request: Request,
+    response: Response,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> AuthResponse:
+    """Change the password, sign out every other device, and keep this one signed in."""
+    enforce_auth_rate_limit(request, "change-password")
+    _reject_demo(user, "change its password")
+    if not verify_password(payload.current_password, user.password_hash):
+        raise HTTPException(status_code=400, detail="Your current password is incorrect")
+    if payload.current_password == payload.new_password:
+        raise HTTPException(status_code=400, detail="Choose a password different from the current one")
+    user.password_hash = hash_password(payload.new_password)
+    user.token_version += 1
+    db.commit()
+    db.refresh(user)
+    return _issue_session(user, response)
+
+
+@router.post("/delete-account", response_model=MessageResponse)
+def delete_account(
+    payload: DeleteAccountRequest,
+    request: Request,
+    response: Response,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> MessageResponse:
+    """Permanently delete the account and every record it owns.
+
+    All user-owned tables cascade on delete, so this removes transactions,
+    budgets, goals, bills, notifications, AI conversations, research runs,
+    and reset tokens in one transaction.
+    """
+    enforce_auth_rate_limit(request, "delete-account")
+    _reject_demo(user, "be deleted")
+    if not verify_password(payload.password, user.password_hash):
+        raise HTTPException(status_code=400, detail="Your password is incorrect")
+    db.delete(user)
+    db.commit()
+    clear_session_cookie(response)
+    return MessageResponse(message="Your account and all of its data have been deleted.")

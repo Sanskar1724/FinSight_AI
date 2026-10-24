@@ -22,6 +22,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
+import { ChangePasswordCard, DeleteAccountCard } from "@/components/account-security";
 import { BillDialog } from "@/components/bill-dialog";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Button } from "@/components/ui/button";
@@ -669,6 +670,13 @@ export default function SettingsPage() {
               </CardContent>
             </Card>
           </div>
+
+          {!user?.is_demo && (
+            <div className="grid gap-4 lg:grid-cols-2">
+              <ChangePasswordCard />
+              <DeleteAccountCard />
+            </div>
+          )}
 
           <Card>
             <CardHeader>
