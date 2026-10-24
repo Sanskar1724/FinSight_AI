@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 from alembic import command
+from alembic.script import ScriptDirectory
 from sqlalchemy import create_engine, inspect, text
 
 from app.core.config import settings
@@ -46,4 +47,5 @@ def test_legacy_create_all_database_gains_new_columns(file_database) -> None:
     with file_database.connect() as connection:
         assert connection.execute(text("SELECT count(*) FROM users")).scalar() == 1
         version = connection.execute(text("SELECT version_num FROM alembic_version")).scalar()
-    assert version == migrate.TOKEN_VERSION_REVISION
+    head = ScriptDirectory.from_config(migrate._alembic_config()).get_current_head()
+    assert version == head

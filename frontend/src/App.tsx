@@ -9,6 +9,7 @@ import { FullPageLoader } from "@/components/ui/spin";
 const AnalyticsPage = lazy(() => import("@/pages/analytics"));
 const AssistantPage = lazy(() => import("@/pages/assistant"));
 const BudgetsPage = lazy(() => import("@/pages/budgets"));
+const ForgotPasswordPage = lazy(() => import("@/pages/forgot-password"));
 const GoalsPage = lazy(() => import("@/pages/goals"));
 const LandingPage = lazy(() => import("@/pages/landing"));
 const LoginPage = lazy(() => import("@/pages/login"));
@@ -17,6 +18,7 @@ const NotificationsPage = lazy(() => import("@/pages/notifications"));
 const OverviewPage = lazy(() => import("@/pages/overview"));
 const RegisterPage = lazy(() => import("@/pages/register"));
 const ResearchPage = lazy(() => import("@/pages/research"));
+const ResetPasswordPage = lazy(() => import("@/pages/reset-password"));
 const ScenariosPage = lazy(() => import("@/pages/scenarios"));
 const SettingsPage = lazy(() => import("@/pages/settings"));
 const TransactionsPage = lazy(() => import("@/pages/transactions"));
@@ -25,6 +27,8 @@ const titles: Record<string, string> = {
   "/": "FinSight AI — See your money clearly",
   "/login": "Sign in — FinSight AI",
   "/register": "Create your account — FinSight AI",
+  "/forgot-password": "Reset your password — FinSight AI",
+  "/reset-password": "Choose a new password — FinSight AI",
   "/app": "Overview — FinSight AI",
   "/app/transactions": "Transactions — FinSight AI",
   "/app/budgets": "Budgets — FinSight AI",
@@ -84,7 +88,23 @@ export default function App() {
               </PageSuspense>
             }
           />
+          <Route
+            path="/forgot-password"
+            element={
+              <PageSuspense>
+                <ForgotPasswordPage />
+              </PageSuspense>
+            }
+          />
         </Route>
+        <Route
+          path="/reset-password"
+          element={
+            <PageSuspense>
+              <ResetPasswordPage />
+            </PageSuspense>
+          }
+        />
         <Route element={<ProtectedRoute />}>
           <Route path="/app" element={<AppShell />}>
             <Route

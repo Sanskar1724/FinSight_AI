@@ -25,6 +25,8 @@ Interactive, authoritative documentation is available at `/api/docs` (Swagger UI
 | GET | `/auth/session` | Return `{"user": ...}`, or `{"user": null}` with 200 when signed out. Used by the web app. |
 | GET | `/auth/me` | Return the current user; `401` when signed out. |
 | POST | `/auth/demo/reset` | Replace demo data with the seeded dataset. Demo account only. |
+| POST | `/auth/forgot-password` | Email a single-use reset link (30 min). Always returns 200 so registered emails can't be discovered. |
+| POST | `/auth/reset-password` | Set a new password with a reset token; signs out every existing session. |
 
 Authentication endpoints are rate-limited per client address. Responses use
 `429` with `Retry-After` when the limit is exceeded. Mutating requests with a

@@ -51,6 +51,17 @@ class Settings(BaseSettings):
     enable_api_docs: bool | None = None
     notification_check_minutes: int = 30
     max_upload_bytes: int = 2_000_000
+    # Public URL of the web app, used in links inside emails.
+    public_app_url: str = "http://localhost:5173"
+    # Outgoing email (password reset). When SMTP_HOST is empty, emails are
+    # written to the log instead of being sent, which suits local development.
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_use_tls: bool = True
+    mail_from: str = "FinSight AI <no-reply@finsight.local>"
+    password_reset_minutes: int = 30
     ai_provider: str = "deterministic"
     ai_base_url: str = "https://api.openai.com/v1"
     ai_api_key: str = ""

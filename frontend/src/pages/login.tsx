@@ -98,6 +98,14 @@ export default function LoginPage() {
             }
             {...form.register("password")}
           />
+          <div className="-mt-1 text-right">
+            <Link
+              to="/forgot-password"
+              className="text-xs font-semibold text-primary hover:underline"
+            >
+              Forgot password?
+            </Link>
+          </div>
 
           {form.formState.errors.root?.message && (
             <p className="rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-2.5 text-xs font-medium text-rose-700">
