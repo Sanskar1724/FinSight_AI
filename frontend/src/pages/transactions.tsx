@@ -77,6 +77,12 @@ export default function TransactionsPage() {
       next.delete("flagged");
       changed = true;
     }
+    const searchParam = next.get("search");
+    if (searchParam) {
+      setSearch(searchParam.slice(0, 120));
+      next.delete("search");
+      changed = true;
+    }
     const categoryParam = next.get("category");
     if (categoryParam && /^\d+$/.test(categoryParam)) {
       setCategoryId(categoryParam);

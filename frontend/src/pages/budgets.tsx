@@ -27,6 +27,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useUrlAction } from "@/hooks/use-url-action";
 import { api, ApiError } from "@/lib/api";
 import type { Budget, BudgetList } from "@/lib/types";
 import {
@@ -103,6 +104,7 @@ export default function BudgetsPage() {
     setEditing(null);
     setDialogOpen(true);
   };
+  useUrlAction("new", openCreate);
 
   const remaining = data ? Math.max(0, data.total_limit - data.total_spend) : 0;
 

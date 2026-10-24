@@ -1,58 +1,17 @@
 import { useQuery } from "@tanstack/react-query";
-import {
-  ArrowLeftRight,
-  Bell,
-  ChartNoAxesCombined,
-  ChevronRight,
-  FlaskConical,
-  LayoutDashboard,
-  LogOut,
-  Menu,
-  MessageSquareText,
-  Plus,
-  Settings,
-  Sparkles,
-  Target,
-  WalletCards,
-  X,
-} from "lucide-react";
+import { Bell, ChevronRight, LogOut, Menu, Plus, Search, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
 import { Brand } from "@/components/brand";
+import { CommandPalette } from "@/components/command-palette";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
+import { useCommandPaletteShortcut } from "@/hooks/use-command-palette-shortcut";
 import { api } from "@/lib/api";
+import { navigation } from "@/lib/navigation";
 import { cn, initials } from "@/lib/utils";
-
-const navigation = [
-  {
-    label: "Workspace",
-    items: [
-      { to: "/app", end: true, label: "Overview", icon: LayoutDashboard },
-      { to: "/app/transactions", label: "Transactions", icon: ArrowLeftRight },
-      { to: "/app/budgets", label: "Budgets", icon: WalletCards },
-      { to: "/app/goals", label: "Goals", icon: Target },
-    ],
-  },
-  {
-    label: "Intelligence",
-    items: [
-      { to: "/app/analytics", label: "Analytics", icon: ChartNoAxesCombined },
-      { to: "/app/scenarios", label: "Scenario lab", icon: Sparkles },
-      { to: "/app/assistant", label: "AI assistant", icon: MessageSquareText },
-      { to: "/app/research", label: "Research lab", icon: FlaskConical },
-    ],
-  },
-  {
-    label: "Account",
-    items: [
-      { to: "/app/notifications", label: "Notifications", icon: Bell },
-      { to: "/app/settings", label: "Settings", icon: Settings },
-    ],
-  },
-];
 
 const titles: Record<string, string> = {
   "/app": "Overview",
@@ -165,6 +124,8 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 export function AppShell() {
   const location = useLocation();
   const [open, setOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  useCommandPaletteShortcut(setPaletteOpen);
   const { user } = useAuth();
   const unread = useQuery({
     queryKey: ["notifications", "unread"],
@@ -233,6 +194,26 @@ export function AppShell() {
           </div>
 
           <div className="ml-auto flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setPaletteOpen(true)}
+              className="group hidden h-9 w-56 items-center gap-2 rounded-xl border border-border bg-card px-3 text-left text-xs text-muted-foreground shadow-sm transition-colors hover:border-primary/25 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:flex xl:w-72"
+              aria-label="Search or jump to (Ctrl+K)"
+            >
+              <Search className="size-3.5" />
+              <span className="flex-1 truncate">Search or jump to…</span>
+              <kbd className="rounded-md border border-border bg-secondary px-1.5 py-0.5 font-sans text-[10px] font-semibold">
+                Ctrl K
+              </kbd>
+            </button>
+            <button
+              type="button"
+              onClick={() => setPaletteOpen(true)}
+              className="grid size-9 place-items-center rounded-xl border border-border bg-card text-muted-foreground shadow-sm transition-colors hover:text-foreground md:hidden"
+              aria-label="Search or jump to"
+            >
+              <Search className="size-4" />
+            </button>
             <Link
               to="/app/notifications"
               className="relative grid size-9 place-items-center rounded-xl border border-border bg-card text-muted-foreground shadow-sm transition-colors hover:border-primary/25 hover:text-foreground"
@@ -257,6 +238,7 @@ export function AppShell() {
           </div>
         </header>
 
+        <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
         <main className="page-container min-h-[calc(100vh-4rem)]">
           <Outlet />
         </main>

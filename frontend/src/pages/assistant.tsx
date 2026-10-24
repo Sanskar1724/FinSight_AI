@@ -24,6 +24,7 @@ import { Select } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spin } from "@/components/ui/spin";
 import { Textarea } from "@/components/ui/input";
+import { useUrlAction } from "@/hooks/use-url-action";
 import { api, ApiError } from "@/lib/api";
 import type {
   AIStatus,
@@ -322,6 +323,11 @@ export default function AssistantPage() {
     setInput("");
     sendMutation.mutate(text);
   };
+
+  // `/app/assistant?q=...` (used by the command palette) asks immediately.
+  useUrlAction("q", (question) => {
+    if (question.trim()) send(question.slice(0, 1000));
+  });
 
   const startNew = () => {
     setCurrentSessionId(null);

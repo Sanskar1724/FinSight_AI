@@ -23,6 +23,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useUrlAction } from "@/hooks/use-url-action";
 import { api, ApiError } from "@/lib/api";
 import type { Goal, GoalContribution, GoalList } from "@/lib/types";
 import { cn, formatDate, formatINR, percentage } from "@/lib/utils";
@@ -91,6 +92,7 @@ export default function GoalsPage() {
     setEditing(null);
     setGoalDialogOpen(true);
   };
+  useUrlAction("new", openCreate);
 
   return (
     <div className="space-y-5">
