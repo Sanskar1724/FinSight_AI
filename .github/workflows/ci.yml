@@ -55,3 +55,56 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run build
+
+  container:
+    name: Docker image on PostgreSQL
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: finsight
+          POSTGRES_PASSWORD: finsight
+          POSTGRES_DB: finsight
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U finsight"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the production image
+        run: docker build -t finsight-ai:ci .
+      - name: Start it against PostgreSQL in production mode
+        run: |
+          docker run -d --name app --network host \
+            -e SECRET_KEY="$(openssl rand -base64 48)" \
+            -e DATABASE_URL="postgresql://finsight:finsight@localhost:5432/finsight" \
+            -e PORT=8000 \
+            finsight-ai:ci
+          for i in $(seq 1 60); do
+            curl -fsS http://localhost:8000/api/health && exit 0
+            sleep 2
+          done
+          exit 1
+      - name: Smoke-test production behaviour
+        run: |
+          set -euo pipefail
+          base=http://localhost:8000
+          curl -fsS "$base/api/health" | grep -q '"database":"postgresql"'
+          test "$(curl -s -o /dev/null -w '%{http_code}' "$base/api/docs")" = 404
+          curl -fsS "$base/" | grep -q 'id="root"'
+          curl -fsS "$base/privacy" | grep -q 'id="root"'
+          curl -s -D headers.txt -o /dev/null -X POST -H "Origin: $base" "$base/api/auth/demo"
+          grep -i '^set-cookie:' headers.txt | grep -qi 'secure'
+          grep -i '^set-cookie:' headers.txt | grep -qi 'httponly'
+          cookie=$(grep -i '^set-cookie:' headers.txt | sed -E 's/^[Ss]et-[Cc]ookie: ([^;]+);.*/\1/' | tr -d '\r')
+          curl -fsS -H "Cookie: $cookie" "$base/api/dashboard" | grep -q '"summary"'
+          curl -fsS -H "Cookie: $cookie" "$base/api/budgets" | grep -q '"items"'
+      - name: Migrations match the models on PostgreSQL
+        run: docker exec app alembic check
+      - name: Container logs
+        if: always()
+        run: docker logs app 2>&1 | tail -n 80
