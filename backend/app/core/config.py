@@ -3,9 +3,12 @@ from __future__ import annotations
 from functools import lru_cache
 from pathlib import Path
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
+DEFAULT_SECRET_KEY = "local-development-secret-change-in-production-please"
+MIN_PRODUCTION_SECRET_LENGTH = 32
 
 
 class Settings(BaseSettings):
@@ -26,7 +29,7 @@ class Settings(BaseSettings):
     environment: str = "development"
     api_prefix: str = "/api"
     database_url: str = f"sqlite:///{(BACKEND_DIR / 'data' / 'finsight.db').as_posix()}"
-    secret_key: str = "local-development-secret-change-in-production-please"
+    secret_key: str = DEFAULT_SECRET_KEY
     access_token_expire_minutes: int = 60 * 24 * 7
     cookie_name: str = "finsight_session"
     cookie_secure: bool = False
@@ -53,6 +56,24 @@ class Settings(BaseSettings):
     prompt_version: str = "chat-v1"
     research_prompt_version: str = "research-v1"
 
+    @model_validator(mode="after")
+    def _require_strong_secret_in_production(self) -> "Settings":
+        # The default key is public in the repository; anyone could forge sessions.
+        if self.is_production and (
+            self.secret_key in {DEFAULT_SECRET_KEY, "replace-with-a-long-random-value"}
+            or len(self.secret_key) < MIN_PRODUCTION_SECRET_LENGTH
+        ):
+            raise ValueError(
+                "SECRET_KEY must be set to a random value of at least "
+                f"{MIN_PRODUCTION_SECRET_LENGTH} characters when ENVIRONMENT=production. "
+                'Generate one with: python -c "import secrets; print(secrets.token_urlsafe(48))"'
+            )
+        return self
+
+    @property
+    def is_production(self) -> bool:
+        return self.environment.lower() == "production"
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
@@ -63,7 +84,7 @@ class Settings(BaseSettings):
 
     @property
     def use_secure_cookies(self) -> bool:
-        return self.cookie_secure or self.environment.lower() == "production"
+        return self.cookie_secure or self.is_production
 
 
 @lru_cache
