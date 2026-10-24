@@ -240,3 +240,19 @@ def test_suggest_is_scoped_to_the_current_user(client: TestClient) -> None:
     client.post("/api/auth/logout")
     signup(client, email="bob@example.com", name="Bob")
     assert client.get("/api/transactions/suggest", params={"merchant": "Private Cafe"}).json()["category_id"] is None
+
+
+def test_csv_text_neutralises_formula_prefixes() -> None:
+    from app.services.csv_safety import csv_text
+
+    for dangerous in ("=1+1", "+cmd", "-2+3", "@SUM(A1)", "\tx", "\rx"):
+        assert csv_text(dangerous) == "'" + dangerous
+    assert csv_text("Swiggy") == "Swiggy"
+    assert csv_text(None) == ""
+
+
+def test_transaction_export_escapes_formula_text(client: TestClient) -> None:
+    signup(client)
+    create_transaction(client, merchant='=HYPERLINK("http://example.com")')
+    body = client.get("/api/transactions/export").text
+    assert "'=HYPERLINK" in body

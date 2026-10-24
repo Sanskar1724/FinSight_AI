@@ -25,6 +25,7 @@ from app.schemas import (
     ResearchScoreOut,
 )
 from app.services.ai_service import ai_status
+from app.services.csv_safety import csv_text
 from app.services.research import execute_research_run, run_to_dict
 
 router = APIRouter(prefix="/research", tags=["research lab"])
@@ -231,15 +232,15 @@ def export_run(
                     run.id,
                     case.slug if case else "",
                     response.mode,
-                    response.question,
-                    response.response,
+                    csv_text(response.question),
+                    csv_text(response.response),
                     response.score_correctness,
                     response.score_relevance,
                     response.score_grounding,
                     response.score_unsupported,
                     response.score_usefulness,
                     response.total_score,
-                    response.failure_notes or "",
+                    csv_text(response.failure_notes),
                 ]
             )
         content = "\ufeff" + output.getvalue()

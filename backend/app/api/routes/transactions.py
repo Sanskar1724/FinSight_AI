@@ -30,6 +30,7 @@ from app.schemas import (
     TransactionUpdate,
 )
 from app.services.csv_import import import_rows, parse_csv
+from app.services.csv_safety import csv_text
 from app.services.finance import detect_anomalies, q
 from app.services.ledger import as_txn, dec, resolve_category, txns_between
 
@@ -246,12 +247,6 @@ def export_transactions(
     writer = csv.writer(output)
     writer.writerow(["date", "type", "amount", "category", "merchant", "payment_method", "notes"])
 
-    def safe(value: object) -> str:
-        text = "" if value is None else str(value)
-        if text[:1] in {"=", "+", "-", "@"}:
-            return "'" + text
-        return text
-
     for row in rows:
         writer.writerow(
             [
@@ -259,9 +254,9 @@ def export_transactions(
                 row.type,
                 f"{dec(row.amount):.2f}",
                 row.category.name,
-                safe(row.merchant),
-                safe(row.payment_method),
-                safe(row.notes),
+                csv_text(row.merchant),
+                csv_text(row.payment_method),
+                csv_text(row.notes),
             ]
         )
     content = "\ufeff" + output.getvalue()

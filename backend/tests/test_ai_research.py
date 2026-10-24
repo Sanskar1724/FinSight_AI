@@ -135,7 +135,13 @@ def test_research_run_executes_real_scored_responses(client: TestClient) -> None
         params={"format": "csv"},
     )
     assert exported_csv.status_code == 200
-    assert exported_csv.content.decode("utf-8-sig").startswith("run_id,case_slug,mode")
+    csv_body = exported_csv.content.decode("utf-8-sig")
+    assert csv_body.startswith("run_id,case_slug,mode")
+    import csv
+    import io
+
+    for row in csv.reader(io.StringIO(csv_body)):
+        assert not any(cell.startswith(("=", "+", "-", "@")) for cell in row), row
 
     deleted = client.delete(f"/api/research/runs/{run_id}")
     assert deleted.status_code == 200
