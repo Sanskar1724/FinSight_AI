@@ -47,6 +47,7 @@ export default function TransactionsPage() {
   const [categoryId, setCategoryId] = useState("");
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
+  const [flagged, setFlagged] = useState("");
   const [sort, setSort] = useState("date_desc");
   const [page, setPage] = useState(1);
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -57,24 +58,37 @@ export default function TransactionsPage() {
   const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
-    if (searchParams.get("new") === "1") {
+    const next = new URLSearchParams(searchParams);
+    let changed = false;
+    if (next.get("new") === "1") {
       setEditing(null);
       setDialogOpen(true);
-      const next = new URLSearchParams(searchParams);
       next.delete("new");
-      setSearchParams(next, { replace: true });
+      changed = true;
     }
-    if (searchParams.get("import") === "1") {
+    if (next.get("import") === "1") {
       setCsvOpen(true);
-      const next = new URLSearchParams(searchParams);
       next.delete("import");
-      setSearchParams(next, { replace: true });
+      changed = true;
     }
+    const flaggedParam = next.get("flagged");
+    if (flaggedParam && /^\d+$/.test(flaggedParam)) {
+      setFlagged(flaggedParam);
+      next.delete("flagged");
+      changed = true;
+    }
+    const categoryParam = next.get("category");
+    if (categoryParam && /^\d+$/.test(categoryParam)) {
+      setCategoryId(categoryParam);
+      next.delete("category");
+      changed = true;
+    }
+    if (changed) setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams]);
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, type, categoryId, start, end, sort]);
+  }, [debouncedSearch, type, categoryId, start, end, flagged, sort]);
 
   const categoriesQuery = useQuery({
     queryKey: ["categories"],
@@ -85,7 +99,7 @@ export default function TransactionsPage() {
   const query = useQuery({
     queryKey: [
       "transactions",
-      { search: debouncedSearch, type, categoryId, start, end, sort, page },
+      { search: debouncedSearch, type, categoryId, start, end, flagged, sort, page },
     ],
     queryFn: () =>
       api.get<TransactionPage>(
@@ -95,6 +109,7 @@ export default function TransactionsPage() {
           category_id: categoryId || undefined,
           start: start || undefined,
           end: end || undefined,
+          flagged: flagged || undefined,
           sort,
           page,
           page_size: PAGE_SIZE,
@@ -133,6 +148,7 @@ export default function TransactionsPage() {
           category_id: categoryId || undefined,
           start: start || undefined,
           end: end || undefined,
+          flagged: flagged || undefined,
         })}`,
         `finsight-transactions-${todayISO()}.csv`,
       );
@@ -144,7 +160,7 @@ export default function TransactionsPage() {
     }
   };
 
-  const activeFilters = [type, categoryId, start, end].filter(Boolean).length;
+  const activeFilters = [type, categoryId, start, end, flagged].filter(Boolean).length;
   const rows = query.data?.items ?? [];
   const total = query.data?.total ?? 0;
   const pages = query.data?.pages ?? 1;
@@ -157,6 +173,7 @@ export default function TransactionsPage() {
     setCategoryId("");
     setStart("");
     setEnd("");
+    setFlagged("");
     setSort("date_desc");
     setPage(1);
   };
@@ -302,18 +319,30 @@ export default function TransactionsPage() {
             </div>
           )}
 
-          {categoryId && (
-            <div className="mt-3 flex items-center gap-2">
+          {(categoryId || flagged) && (
+            <div className="mt-3 flex flex-wrap items-center gap-2">
               <span className="text-[10px] text-muted-foreground">Active:</span>
-              <button
-                type="button"
-                onClick={() => setCategoryId("")}
-                className="inline-flex items-center gap-1 rounded-full border border-primary/15 bg-primary/5 px-2.5 py-1 text-[10px] font-semibold text-primary"
-              >
-                {(categoriesQuery.data ?? []).find((item) => String(item.id) === categoryId)?.name ??
-                  "Category"}
-                <X className="size-3" />
-              </button>
+              {categoryId && (
+                <button
+                  type="button"
+                  onClick={() => setCategoryId("")}
+                  className="inline-flex items-center gap-1 rounded-full border border-primary/15 bg-primary/5 px-2.5 py-1 text-[10px] font-semibold text-primary"
+                >
+                  {(categoriesQuery.data ?? []).find((item) => String(item.id) === categoryId)?.name ??
+                    "Category"}
+                  <X className="size-3" />
+                </button>
+              )}
+              {flagged && (
+                <button
+                  type="button"
+                  onClick={() => setFlagged("")}
+                  className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-semibold text-amber-700"
+                >
+                  Unusual only
+                  <X className="size-3" />
+                </button>
+              )}
             </div>
           )}
         </div>

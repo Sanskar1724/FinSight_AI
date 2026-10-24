@@ -35,9 +35,12 @@ import { Spin } from "@/components/ui/spin";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/hooks/use-auth";
+import { useTabParam } from "@/hooks/use-tab-param";
 import { api, ApiError, downloadBlob } from "@/lib/api";
 import type { Bill, NotificationPreferences } from "@/lib/types";
 import { cn, formatDate, formatINR, todayISO } from "@/lib/utils";
+
+const SETTINGS_TABS = ["notifications", "bills", "account"] as const;
 
 const preferenceGroups = [
   {
@@ -99,6 +102,7 @@ export default function SettingsPage() {
   const [resetOpen, setResetOpen] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [tab, setTab] = useTabParam(SETTINGS_TABS, "notifications");
 
   const prefsQuery = useQuery({
     queryKey: ["notifications", "preferences"],
@@ -213,7 +217,7 @@ export default function SettingsPage() {
         description="Account details, notification rules, bill reminders, and the controls you need to leave cleanly."
       />
 
-      <Tabs defaultValue="notifications">
+      <Tabs value={tab} onValueChange={setTab}>
         <TabsList className="h-auto w-full justify-start overflow-x-auto p-1 sm:w-auto">
           <TabsTrigger value="notifications">
             <Bell className="mr-1.5 size-3.5" />

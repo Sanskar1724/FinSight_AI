@@ -108,6 +108,8 @@ export function deltaTone(value: number | null | undefined, inverse = false) {
 export function appHref(path: string | null | undefined) {
   if (!path) return "/app";
   if (path.startsWith("/app")) return path;
+  if (path === "/") return "/app";
+  if (path.startsWith("/?")) return `/app${path.slice(1)}`;
   const known = [
     "/transactions",
     "/budgets",

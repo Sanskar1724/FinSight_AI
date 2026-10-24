@@ -44,6 +44,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useTabParam } from "@/hooks/use-tab-param";
 import { api, ApiError, buildQuery, downloadBlob } from "@/lib/api";
 import type { Analytics, RecurringCandidate } from "@/lib/types";
 import {
@@ -56,6 +57,8 @@ import {
   percentage,
   todayISO,
 } from "@/lib/utils";
+
+const ANALYTICS_TABS = ["overview", "patterns", "forecast"] as const;
 
 const frequencyLabels: Record<RecurringCandidate["frequency"], string> = {
   weekly: "Weekly",
@@ -88,6 +91,7 @@ export default function AnalyticsPage() {
   const [start, setStart] = useState(addMonthsISO(currentMonthISO(), -5));
   const [end, setEnd] = useState(todayISO());
   const [exporting, setExporting] = useState(false);
+  const [tab, setTab] = useTabParam(ANALYTICS_TABS, "overview");
   const invalidRange = start > end;
 
   const analyticsQuery = useQuery({
@@ -311,7 +315,7 @@ export default function AnalyticsPage() {
             />
           </div>
 
-          <Tabs defaultValue="overview">
+          <Tabs value={tab} onValueChange={setTab}>
             <TabsList className="h-auto w-full justify-start overflow-x-auto p-1 sm:w-auto">
               <TabsTrigger value="overview">Trends &amp; categories</TabsTrigger>
               <TabsTrigger value="patterns">Recurring &amp; unusual</TabsTrigger>
