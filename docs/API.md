@@ -22,7 +22,8 @@ Interactive, authoritative documentation is available at `/api/docs` (Swagger UI
 | POST | `/auth/login` | Sign in. |
 | POST | `/auth/demo` | Create/repair and enter the fictional demo account. |
 | POST | `/auth/logout` | Revoke issued sessions and clear the cookie. |
-| GET | `/auth/me` | Return the current user. |
+| GET | `/auth/session` | Return `{"user": ...}`, or `{"user": null}` with 200 when signed out. Used by the web app. |
+| GET | `/auth/me` | Return the current user; `401` when signed out. |
 | POST | `/auth/demo/reset` | Replace demo data with the seeded dataset. Demo account only. |
 
 Authentication endpoints are rate-limited per client address. Responses use
@@ -45,6 +46,7 @@ HttpOnly, SameSite=Lax, and Secure when `COOKIE_SECURE=true` or
 | --- | --- | --- |
 | GET | `/transactions` | Filtered, searched, sorted, paginated ledger. |
 | POST | `/transactions` | Create a transaction. |
+| GET | `/transactions/suggest?merchant=` | Category and payment method last used for a matching merchant (exact, then prefix). |
 | GET | `/transactions/{id}` | Fetch one transaction. |
 | PATCH | `/transactions/{id}` | Update a transaction. |
 | DELETE | `/transactions/{id}` | Delete a transaction. |
@@ -52,7 +54,7 @@ HttpOnly, SameSite=Lax, and Secure when `COOKIE_SECURE=true` or
 | POST | `/transactions/import/preview` | Validate and preview a CSV upload. |
 | POST | `/transactions/import` | Commit a validated CSV import. |
 
-List filters include `start`, `end`, `type`, `category_id`, `search`, `flagged`, `sort`, `page`, and `page_size`. Sort values use `<field>_<direction>`, for example `date_desc` or `amount_asc`.
+List and export filters include `start`, `end`, `type`, `category_id`, `search`, `flagged`, `sort`, `page`, and `page_size`. `flagged=1` returns every current unusual-spending indicator; `flagged=<id>` returns that single transaction (used by notification links). Sort values use `<field>_<direction>`, for example `date_desc` or `amount_asc`.
 
 ## Dashboard, analytics, and scenarios
 

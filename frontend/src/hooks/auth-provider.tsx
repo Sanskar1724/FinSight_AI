@@ -4,7 +4,7 @@ import type { PropsWithChildren } from "react";
 
 import { AuthContext } from "@/hooks/auth-context";
 import type { AuthContextValue } from "@/hooks/auth-context";
-import { api, ApiError } from "@/lib/api";
+import { api } from "@/lib/api";
 import type { AuthResponse, User } from "@/lib/types";
 
 export function AuthProvider({ children }: PropsWithChildren) {
@@ -12,14 +12,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const [forcedOut, setForcedOut] = useState(false);
   const meQuery = useQuery({
     queryKey: ["auth", "me"],
-    queryFn: async () => {
-      try {
-        return await api.get<User>("/auth/me");
-      } catch (error) {
-        if (error instanceof ApiError && error.status === 401) return null;
-        throw error;
-      }
-    },
+    queryFn: async () => (await api.get<{ user: User | null }>("/auth/session")).user,
     retry: false,
     staleTime: 5 * 60 * 1000,
   });

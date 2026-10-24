@@ -213,3 +213,17 @@ def test_validation_errors_do_not_create_records(client: TestClient) -> None:
         },
     )
     assert wrong_kind.status_code == 422
+
+
+def test_session_probe_returns_null_user_when_signed_out(client: TestClient) -> None:
+    response = client.get("/api/auth/session")
+    assert response.status_code == 200
+    assert response.json() == {"user": None}
+    assert response.headers["cache-control"] == "no-store"
+
+    signup(client)
+    signed_in = client.get("/api/auth/session").json()
+    assert signed_in["user"]["email"] == "alice@example.com"
+
+    client.post("/api/auth/logout")
+    assert client.get("/api/auth/session").json() == {"user": None}

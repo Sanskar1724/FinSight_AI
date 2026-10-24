@@ -41,6 +41,12 @@ class AuthResponse(BaseModel):
     user: UserOut
 
 
+class SessionResponse(BaseModel):
+    """Current session; ``user`` is null when nobody is signed in."""
+
+    user: UserOut | None = None
+
+
 # ---------- Categories ----------
 class CategoryOut(ORMModel):
     id: int

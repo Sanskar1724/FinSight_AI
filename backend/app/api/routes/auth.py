@@ -15,7 +15,14 @@ from app.core.rate_limit import enforce_auth_rate_limit
 from app.core.security import create_access_token, hash_password, verify_password
 from app.db.base import get_db
 from app.models import NotificationPreference, User
-from app.schemas import AuthResponse, LoginRequest, MessageResponse, RegisterRequest, UserOut
+from app.schemas import (
+    AuthResponse,
+    LoginRequest,
+    MessageResponse,
+    RegisterRequest,
+    SessionResponse,
+    UserOut,
+)
 from app.seed import reset_demo, seed_demo
 from app.services.notifications import get_or_create_preferences
 
@@ -94,6 +101,13 @@ def logout(
         db.commit()
     clear_session_cookie(response)
     return MessageResponse(message="Signed out")
+
+
+@router.get("/session", response_model=SessionResponse)
+def session(user: User | None = Depends(get_current_user_optional)) -> SessionResponse:
+    """Session probe for the web app: 200 with ``user: null`` when signed out,
+    so loading a public page does not produce a 401."""
+    return SessionResponse(user=UserOut.model_validate(user) if user else None)
 
 
 @router.get("/me", response_model=UserOut)
