@@ -1,0 +1,10 @@
+# Store text with LF line endings in the repository and check it out with LF
+# on every platform, so diffs stay clean across Windows, macOS, and Linux.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.ico binary
+*.woff2 binary
+*.db binary
