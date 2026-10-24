@@ -576,9 +576,9 @@ def reset_demo(db: Session) -> User:
 
 
 def ensure_schema_and_demo() -> None:
-    from app.db.base import Base, engine
+    from app.db.migrate import upgrade_database
 
-    Base.metadata.create_all(bind=engine)
+    upgrade_database()
     with SessionLocal() as db:
         seed_demo(db)
 
@@ -587,9 +587,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Seed FinSight AI demo data")
     parser.add_argument("--reset", action="store_true", help="Delete and recreate the demo account")
     args = parser.parse_args()
-    from app.db.base import Base, engine
+    from app.db.migrate import upgrade_database
 
-    Base.metadata.create_all(bind=engine)
+    upgrade_database()
     with SessionLocal() as db:
         user = seed_demo(db, reset=args.reset)
         print(f"Demo user ready: {user.email} (id={user.id})")

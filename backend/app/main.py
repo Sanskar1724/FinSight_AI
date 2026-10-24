@@ -30,7 +30,7 @@ from app.api.routes import (
     transactions,
 )
 from app.core.config import BACKEND_DIR, settings
-from app.db.base import Base, SessionLocal, engine
+from app.db.base import SessionLocal
 from app.models import User
 from app.services.notifications import evaluate_notifications
 
@@ -54,7 +54,9 @@ def scheduled_notification_job() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):  # type: ignore[no-untyped-def]
     if settings.auto_create_tables:
-        Base.metadata.create_all(bind=engine)
+        from app.db.migrate import upgrade_database
+
+        upgrade_database()
     if settings.seed_demo_on_startup:
         try:
             from app.seed import seed_demo

@@ -14,8 +14,8 @@ from app.db.base import Base  # noqa: E402
 from app import models  # noqa: F401,E402  (register mappings)
 
 config = context.config
-if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+if config.config_file_name is not None and config.attributes.get("configure_logger", True):
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 config.set_main_option("sqlalchemy.url", settings.database_url)
 target_metadata = Base.metadata
