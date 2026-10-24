@@ -42,6 +42,9 @@ class Settings(BaseSettings):
     timezone: str = "Asia/Kolkata"
     auto_create_tables: bool = True
     seed_demo_on_startup: bool = True
+    # Restore the public demo account to its seeded data every night (03:00 in
+    # TIMEZONE) so visitors always see a clean workspace.
+    demo_nightly_reset: bool = True
     enable_scheduler: bool = True
     # Interactive API docs are on in development and off in production unless
     # explicitly enabled, so the full API surface is not advertised publicly.

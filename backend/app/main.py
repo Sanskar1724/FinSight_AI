@@ -51,6 +51,19 @@ def scheduled_notification_job() -> None:
                 logger.exception("Scheduled notification check failed for user_id=%s", user.id)
 
 
+def scheduled_demo_reset_job() -> None:
+    """Restore the public demo account to its seeded, fictional data."""
+    from app.seed import reset_demo
+
+    with SessionLocal() as db:
+        try:
+            reset_demo(db)
+            logger.info("Demo workspace reset to seeded data")
+        except Exception:
+            db.rollback()
+            logger.exception("Scheduled demo reset failed")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):  # type: ignore[no-untyped-def]
     if settings.auto_create_tables:
@@ -77,6 +90,16 @@ async def lifespan(app: FastAPI):  # type: ignore[no-untyped-def]
                 replace_existing=True,
                 max_instances=1,
             )
+            if settings.seed_demo_on_startup and settings.demo_nightly_reset:
+                scheduler.add_job(
+                    scheduled_demo_reset_job,
+                    "cron",
+                    hour=3,
+                    minute=0,
+                    id="demo-nightly-reset",
+                    replace_existing=True,
+                    max_instances=1,
+                )
             scheduler.start()
             logger.info("Notification scheduler started")
         except Exception:
