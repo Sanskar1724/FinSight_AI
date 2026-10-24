@@ -36,3 +36,17 @@ def test_api_docs_default_off_in_production_and_can_be_enabled() -> None:
     assert Settings(
         _env_file=None, environment="production", secret_key=strong, enable_api_docs=True
     ).api_docs_enabled
+
+
+def test_hosted_postgres_urls_use_the_installed_psycopg_driver() -> None:
+    expected = "postgresql+psycopg://u:p@host.neon.tech/db?sslmode=require"
+    for given in (
+        "postgresql://u:p@host.neon.tech/db?sslmode=require",
+        "postgres://u:p@host.neon.tech/db?sslmode=require",
+        expected,
+    ):
+        settings = Settings(_env_file=None, database_url=given)
+        assert settings.database_url == expected
+        assert settings.is_postgres
+    sqlite = Settings(_env_file=None, database_url="sqlite:///./data/x.db")
+    assert sqlite.database_url == "sqlite:///./data/x.db"

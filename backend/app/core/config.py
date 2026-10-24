@@ -3,7 +3,7 @@ from __future__ import annotations
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import model_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
@@ -74,6 +74,17 @@ class Settings(BaseSettings):
     research_max_cases: int = 60
     prompt_version: str = "chat-v1"
     research_prompt_version: str = "research-v1"
+
+    @field_validator("database_url")
+    @classmethod
+    def _use_installed_postgres_driver(cls, value: str) -> str:
+        # Hosted providers (Neon, Render, Heroku) hand out postgres:// or
+        # postgresql:// URLs, which SQLAlchemy maps to psycopg2. This project
+        # ships psycopg 3, so point those URLs at it.
+        for prefix in ("postgres://", "postgresql://"):
+            if value.startswith(prefix):
+                return "postgresql+psycopg://" + value[len(prefix):]
+        return value
 
     @model_validator(mode="after")
     def _require_strong_secret_in_production(self) -> "Settings":
