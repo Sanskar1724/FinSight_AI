@@ -26,6 +26,7 @@ from app.schemas import (
     TransactionCreate,
     TransactionOut,
     TransactionPage,
+    TransactionSuggestion,
     TransactionUpdate,
 )
 from app.services.csv_import import import_rows, parse_csv
@@ -181,6 +182,41 @@ def create_transaction(
     _evaluate_after_change(db, user)
     db.refresh(txn)
     return TransactionOut.model_validate(txn)
+
+
+@router.get("/suggest", response_model=TransactionSuggestion)
+def suggest_transaction_fields(
+    merchant: str = Query(min_length=2, max_length=120),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> TransactionSuggestion:
+    """Suggest category and payment method from the user's own history.
+
+    An exact (case-insensitive) merchant match wins; otherwise the most recent
+    merchant starting with the typed text is used.
+    """
+    term = merchant.strip()
+    if len(term) < 2:
+        return TransactionSuggestion()
+    base = select(Transaction).where(Transaction.user_id == user.id)
+    recent = (Transaction.occurred_on.desc(), Transaction.id.desc())
+    match = db.scalar(
+        base.where(func.lower(Transaction.merchant) == term.lower()).order_by(*recent).limit(1)
+    )
+    if match is None:
+        match = db.scalar(
+            base.where(Transaction.merchant.istartswith(term, autoescape=True))
+            .order_by(*recent)
+            .limit(1)
+        )
+    if match is None:
+        return TransactionSuggestion()
+    return TransactionSuggestion(
+        merchant=match.merchant,
+        type=match.type,
+        category_id=match.category_id,
+        payment_method=match.payment_method,
+    )
 
 
 @router.get("/export")

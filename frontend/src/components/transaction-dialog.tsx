@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowDownLeft, ArrowUpRight } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -16,8 +16,15 @@ import { Input, Textarea } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Spin } from "@/components/ui/spin";
-import { api, ApiError } from "@/lib/api";
-import type { Category, Transaction, TransactionPayload, TransactionType } from "@/lib/types";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import { api, ApiError, buildQuery } from "@/lib/api";
+import type {
+  Category,
+  Transaction,
+  TransactionPayload,
+  TransactionSuggestion,
+  TransactionType,
+} from "@/lib/types";
 import { cn, todayISO } from "@/lib/utils";
 
 const paymentMethods = [
@@ -54,6 +61,10 @@ export function TransactionDialog({
   const [paymentMethod, setPaymentMethod] = useState("UPI");
   const [notes, setNotes] = useState("");
   const [error, setError] = useState("");
+  // Fields the user picked by hand are never overwritten by suggestions.
+  const [touched, setTouched] = useState({ category: false, method: false });
+  const [suggested, setSuggested] = useState(false);
+  const debouncedMerchant = useDebouncedValue(merchant.trim(), 350);
 
   const categoriesQuery = useQuery({
     queryKey: ["categories"],
@@ -62,6 +73,19 @@ export function TransactionDialog({
   });
 
   const categories = (categoriesQuery.data ?? []).filter((category) => category.kind === type);
+  const methodOptions = paymentMethods.includes(paymentMethod)
+    ? paymentMethods
+    : [paymentMethod, ...paymentMethods];
+
+  const suggestionQuery = useQuery({
+    queryKey: ["transactions", "suggest", debouncedMerchant.toLowerCase()],
+    queryFn: () =>
+      api.get<TransactionSuggestion>(
+        `/transactions/suggest${buildQuery({ merchant: debouncedMerchant })}`,
+      ),
+    enabled: open && !isEdit && debouncedMerchant.length >= 2,
+    staleTime: 60 * 1000,
+  });
 
   useEffect(() => {
     if (!open) return;
@@ -83,15 +107,32 @@ export function TransactionDialog({
       setPaymentMethod("UPI");
       setNotes("");
     }
+    setTouched({ category: false, method: false });
+    setSuggested(false);
   }, [open, transaction, defaultType]);
 
+  // Switching between income and expense invalidates a category of the other kind.
   useEffect(() => {
-    if (!open) return;
-    if (categories.length > 0 && !categories.some((category) => String(category.id) === categoryId)) {
-      setCategoryId(String(categories[0].id));
-    }
-    if (categories.length === 0) setCategoryId("");
+    if (!open || !categoryId || categories.length === 0) return;
+    if (!categories.some((category) => String(category.id) === categoryId)) setCategoryId("");
   }, [open, categories, categoryId]);
+
+  const suggestion = suggestionQuery.data;
+  useEffect(() => {
+    if (!suggestion?.category_id || suggestion.type !== type) return;
+    let applied = false;
+    if (!touched.category && String(suggestion.category_id) !== categoryId) {
+      setCategoryId(String(suggestion.category_id));
+      applied = true;
+    }
+    if (!touched.method && suggestion.payment_method && suggestion.payment_method !== paymentMethod) {
+      setPaymentMethod(suggestion.payment_method);
+      applied = true;
+    }
+    if (applied) setSuggested(true);
+    // Only react to a new suggestion, not to the fields it sets.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [suggestion, type]);
 
   const mutation = useMutation({
     mutationFn: (payload: TransactionPayload) =>
@@ -216,14 +257,30 @@ export function TransactionDialog({
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="txn-category">Category</Label>
+            <div className="flex h-5 items-center justify-between gap-2">
+              <Label htmlFor="txn-category">Category</Label>
+              {suggested && !touched.category && (
+                <span
+                  className="inline-flex items-center gap-1 text-[10px] font-semibold text-primary"
+                  title="Filled in from your previous entries for this merchant"
+                >
+                  <Sparkles className="size-3" />
+                  From history
+                </span>
+              )}
+            </div>
             <Select
               id="txn-category"
               value={categoryId}
-              onChange={(event) => setCategoryId(event.target.value)}
+              onChange={(event) => {
+                setCategoryId(event.target.value);
+                setTouched((current) => ({ ...current, category: true }));
+              }}
               disabled={categoriesQuery.isLoading}
             >
-              {categoriesQuery.isLoading && <option value="">Loading categories…</option>}
+              <option value="" disabled>
+                {categoriesQuery.isLoading ? "Loading categories…" : "Choose a category"}
+              </option>
               {categories.map((category) => (
                 <option key={category.id} value={category.id}>
                   {category.name}
@@ -238,9 +295,12 @@ export function TransactionDialog({
           <Select
             id="txn-method"
             value={paymentMethod}
-            onChange={(event) => setPaymentMethod(event.target.value)}
+            onChange={(event) => {
+              setPaymentMethod(event.target.value);
+              setTouched((current) => ({ ...current, method: true }));
+            }}
           >
-            {paymentMethods.map((method) => (
+            {methodOptions.map((method) => (
               <option key={method} value={method}>
                 {method}
               </option>

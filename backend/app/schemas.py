@@ -102,6 +102,15 @@ class TransactionPage(BaseModel):
     pages: int
 
 
+class TransactionSuggestion(BaseModel):
+    """Category and payment method last used for a merchant, if known."""
+
+    merchant: str | None = None
+    type: Literal["income", "expense"] | None = None
+    category_id: int | None = None
+    payment_method: str | None = None
+
+
 class CSVRowPreview(BaseModel):
     row_number: int
     valid: bool

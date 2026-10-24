@@ -219,6 +219,13 @@ export interface Bill {
   is_paid: boolean;
 }
 
+export interface TransactionSuggestion {
+  merchant: string | null;
+  type: TransactionType | null;
+  category_id: number | null;
+  payment_method: string | null;
+}
+
 export interface TrendPoint {
   label: string;
   period: string;

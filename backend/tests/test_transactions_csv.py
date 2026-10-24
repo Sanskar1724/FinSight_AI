@@ -208,3 +208,35 @@ def test_category_endpoint_requires_auth(client: TestClient) -> None:
     categories = client.get("/api/categories").json()
     assert any(item["slug"] == "food-dining" for item in categories)
     assert any(item["kind"] == "income" for item in categories)
+
+
+def test_suggest_uses_latest_matching_merchant(client: TestClient) -> None:
+    signup(client)
+    create_transaction(client, slug="groceries", merchant="BigBasket", occurred_on="2026-01-05")
+    create_transaction(client, slug="food-dining", merchant="bigbasket", occurred_on="2026-02-05")
+    groceries = category_id(client, "groceries")
+    food = category_id(client, "food-dining")
+
+    exact = client.get("/api/transactions/suggest", params={"merchant": "BIGBASKET"}).json()
+    assert exact["category_id"] == food
+    assert exact["payment_method"] == "UPI"
+
+    prefix = client.get("/api/transactions/suggest", params={"merchant": "Big"}).json()
+    assert prefix["category_id"] in {groceries, food}
+
+    # LIKE wildcards in the input are treated literally.
+    assert client.get("/api/transactions/suggest", params={"merchant": "%%"}).json()["category_id"] is None
+    assert client.get("/api/transactions/suggest", params={"merchant": "Unknown shop"}).json() == {
+        "merchant": None,
+        "type": None,
+        "category_id": None,
+        "payment_method": None,
+    }
+
+
+def test_suggest_is_scoped_to_the_current_user(client: TestClient) -> None:
+    signup(client)
+    create_transaction(client, merchant="Private Cafe")
+    client.post("/api/auth/logout")
+    signup(client, email="bob@example.com", name="Bob")
+    assert client.get("/api/transactions/suggest", params={"merchant": "Private Cafe"}).json()["category_id"] is None
