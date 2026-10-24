@@ -75,11 +75,18 @@ const config: Config = {
         shimmer: {
           "100%": { transform: "translateX(100%)" },
         },
+        // Dialogs are centred with translate(-50%, -50%); the entrance
+        // animation must keep that transform or the dialog ends up off-centre.
+        "dialog-in": {
+          from: { opacity: "0", transform: "translate(-50%, -48%) scale(0.98)" },
+          to: { opacity: "1", transform: "translate(-50%, -50%) scale(1)" },
+        },
       },
       animation: {
         "fade-up": "fade-up 0.45s cubic-bezier(0.16, 1, 0.3, 1) both",
         "fade-in": "fade-in 0.3s ease-out both",
         shimmer: "shimmer 1.6s infinite",
+        "dialog-in": "dialog-in 0.22s cubic-bezier(0.16, 1, 0.3, 1) both",
       },
     },
   },
