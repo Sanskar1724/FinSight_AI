@@ -18,11 +18,11 @@ tested, committed, and pushed separately.
 | 1 | Scenario baseline correctness | Complete |
 | 2 | Authentication and session security | Complete |
 | 3 | Notification lifecycle and links | Complete |
-| 4 | AI intent, history, and reliability | Planned |
-| 5 | Frontend navigation, state, and accessibility | Planned |
-| 6 | Analytics date scope | Planned |
-| 7 | Research lifecycle and safe exports | Planned |
-| 8 | Automated testing and production readiness | Planned |
+| 4 | AI intent, history, and reliability | Partial (intent routing) |
+| 5 | Frontend navigation, state, and accessibility | Partial (deep links, palette) |
+| 6 | Analytics date scope | Partial (comparison periods) |
+| 7 | Research lifecycle and safe exports | Partial (safe exports) |
+| 8 | Automated testing and production readiness | Partial (CI, migrations) |
 
 ## Upgrade 1 - Scenario baseline correctness
 
@@ -210,3 +210,48 @@ Planned scope: add CI gates, expand end-to-end coverage, verify PostgreSQL
 compatibility and migration behavior, and document production limitations.
 Tests must run the full backend suite, frontend typecheck/lint/build, and
 critical user journeys in CI.
+
+## 24 October 2026 - Review pass
+
+A full review of the running app (desktop and mobile screenshots, headless
+browser journeys, and SQL query counts) found and fixed the following. Each
+item is a separate commit with tests.
+
+**Correctness**
+
+- Existing databases crashed every login (`no such column:
+  users.token_version`): startup used `create_all`, which never alters
+  tables. Startup now runs Alembic and stamps pre-Alembic databases first.
+- Dashboard comparisons used a trailing window (1-24 Oct vs 7-30 Sep) that
+  skipped payday and rent, showing expenses +77.9% instead of +9.0%.
+  Month-to-date ranges now compare with the same days of the previous month.
+- Clearing one anomaly alert by prefix also cleared others (`anomaly:1`
+  matched `anomaly:12`).
+- The assistant answered "What is my net cash flow?" with generic guidance,
+  and scoped "this month vs last month" questions to last month.
+- Every dialog rendered off-centre (an animation overrode the centring
+  transform), pushing the save button below the fold.
+- Research and ledger CSV exports could emit spreadsheet formulas.
+
+**Performance**
+
+- Budgets: one windowed query instead of five per budget. Queries per
+  request: budgets 37 -> 3, dashboard 49 -> 15, analytics 43 -> 9.
+- Notification evaluation runs against an in-memory snapshot. Queries per
+  transaction write: 111 -> 16.
+
+**Usability**
+
+- Ctrl/⌘+K command palette; merchant-based category suggestions; cumulative
+  cash-flow chart; compact two-up metrics on phones; visible row actions;
+  consistent paise display; `/auth/session` probe so public pages no longer
+  log 401s.
+
+**Still open**
+
+- Upgrade 4: AI session history isolation tests and hosted-model rate limits.
+- Upgrade 5: broader keyboard and screen-reader audit.
+- Upgrade 7: durable research runs across restarts/workers.
+- Upgrade 8: PostgreSQL CI job and end-to-end tests in CI.
+- `zod` 3 advisory (see README validation notes).
+

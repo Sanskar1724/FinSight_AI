@@ -14,7 +14,9 @@ The same data can be opened with **Open dashboard**, **Explore the live demo**, 
 ## What is included
 
 - Responsive marketing page, authentication flow, and protected application shell.
+- Command palette (Ctrl/⌘+K or `/`) to jump to any page, run common actions, search the ledger, or ask the assistant.
 - Ledger with filtering, search, sorting, pagination, CSV import preview, and CSV export.
+- Category and payment-method suggestions from your own history as you type a merchant.
 - Monthly budgets with warning/critical thresholds and copy-from-previous-month.
 - Savings goals, contributions, pace tracking, and projections.
 - Analytics for categories, monthly trends, recurring payments, anomalies, and reports.
@@ -97,14 +99,16 @@ npm run build
 npm audit --omit=dev
 ```
 
-Last validated on 23 October 2026:
+Last validated on 24 October 2026:
 
-- Backend: 47 tests passed.
+- Backend: 77 tests passed; `alembic check` reports the migrations match the models.
 - TypeScript: passed.
 - ESLint: 0 errors, 0 warnings.
-- Production build: passed with route-level code splitting.
-- Production dependency audit: 0 vulnerabilities.
-- Headless Chrome smoke test: every public and authenticated route, research run/export/delete, Settings bills, mobile layout, and both 404 variants passed with no runtime exceptions or console errors.
+- Production build: passed. React and the router ship in a long-lived vendor chunk; pages and charts load on demand.
+- Headless Chrome journeys: demo sign-in, add/search/delete a transaction (including history suggestions), assistant answers, notification links, tab deep links, budgets, scenarios, command palette, sign-out, and registration onboarding passed with no runtime errors.
+- Production dependency audit: 1 high-severity advisory in `zod` 3 (GHSA-mrhx-c7xc-m3w5). The fix requires the breaking Zod 4 upgrade together with `@hookform/resolvers` 5. Zod only validates small client-side forms here, so this is tracked rather than force-upgraded.
+
+GitHub Actions (`.github/workflows/ci.yml`) runs the backend tests, the migration check, and frontend lint, typecheck, and build on every push and pull request.
 
 ## Configuration
 
