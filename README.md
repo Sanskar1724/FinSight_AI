@@ -14,7 +14,7 @@ Part 1 asks one question: **do FinSight's three grounding components get measura
 | --- | --- | --- | --- | --- | --- |
 | **E1** | Question router (`backend/app/services/ai_context.py`) | [Banking77](https://github.com/PolyAI-LDN/task-specific-datasets): 13,083 real online-banking customer queries, 77 intents | FinSight's hashed bag-of-words features with a nearest-intent rule | TF-IDF + logistic regression; `bge-small-en-v1.5` and `bge-m3` embeddings with centroid or logistic regression; full data and 5 / 10 examples per intent | Accuracy, macro-F1 |
 | **E2** | Knowledge retrieval (`backend/app/services/knowledge.py`) | [FiQA-2018](https://github.com/beir-cellar/beir) (BEIR): 57,638 real finance forum answers, 648 test questions | 256-dim hashed bag-of-words + 0.35 keyword overlap, ported line by line | BM25; dense `bge-small-en-v1.5`, `bge-m3`; hybrid reciprocal-rank fusion; hybrid + `bge-reranker-base` | nDCG@10, MRR@10, Recall@100 |
-| **E3** | Numeric grounding ("proof on every number") | [FinQA](https://github.com/czyssrs/FinQA): 1,147 test questions over real S&P 500 earnings reports | LLM answers directly | LLM writes a Python program; program + verifier that rejects any number not found in the report, retries once, then abstains | Accuracy, coverage, selective accuracy, ungrounded-program rate |
+| **E3** | Numeric grounding ("proof on every number") | [FinQA](https://github.com/czyssrs/FinQA): 1,147 test questions over real S&P 500 earnings reports | LLM answers directly (after brief reasoning) | Reason-then-program; program + grounding check (retry once, then abstain); agreement check (answer only when direct and program agree); agreement + grounding | Accuracy, coverage, right-when-answering (selective accuracy) |
 
 All results include 95% bootstrap confidence intervals, timing per query, and the exact configuration, so they can go straight into the paper's tables.
 
@@ -25,6 +25,12 @@ All results include 95% bootstrap confidence intervals, timing per query, and th
 - **FinQA:** the original paper reports 61.2% execution accuracy for FinQANet against 91.2% for human experts ([Chen et al., 2021](https://arxiv.org/abs/2109.00122)).
 
 These numbers come from different setups, so treat them as context, not as direct comparisons. The fair comparison in each experiment is against the row marked **(current)**, which is what FinSight runs today.
+
+## Results so far
+
+**E1 (final, run 1):** on 3,080 Banking77 test questions, FinSight's current representation scores 65.5% (full data), 52.5% (10 per intent) and 45.1% (5 per intent). `bge-small-en-v1.5` + logistic regression scores 93.3%, 86.8% and 82.8%; `bge-m3` is statistically tied. E1 is switched off by default now.
+
+**E3 (run 2, Qwen 2.5 3B, full report context, code arms without a reasoning step):** direct 59.0%, program 48.5%, program + grounding check 46.8% (93% coverage, 50.3% right when answering). The code arms were disadvantaged because only the direct arm could reason first. Run 3 fixes that, adds the agreement arms, handles % and scale in the grounding check, and uses the gold context and a 7B model.
 
 ## Run it on Kaggle
 
@@ -42,8 +48,9 @@ These numbers come from different setups, so treat them as context, not as direc
 
 | Setting | Default | Try |
 | --- | --- | --- |
-| `LLM_NAME` | `Qwen/Qwen2.5-3B-Instruct` | `Qwen/Qwen2.5-7B-Instruct` with `LLM_4BIT = True` for stronger numeric results |
-| `FINQA_N` | 200 | 1147 for the full FinQA test set (about 5× longer) |
+| `LLM_NAME` | `Qwen/Qwen2.5-7B-Instruct` in 4-bit (falls back to 3B fp16 if 4-bit loading fails) | Any instruction-tuned model on Hugging Face |
+| `FINQA_CONTEXT` | `gold` (annotated supporting facts) | `full` for the whole report (about 10× slower) |
+| `FINQA_N` | 300 | 1147 for the full FinQA test set (about 4× longer) |
 | `EMBED_MODELS` | `bge-small-en-v1.5`, `bge-m3` | Add `BAAI/bge-base-en-v1.5` or a finance-tuned embedding model |
 | `RERANKER_MODEL` | `BAAI/bge-reranker-base` | `BAAI/bge-reranker-v2-m3` (multilingual, slower) |
 
@@ -63,7 +70,7 @@ These numbers come from different setups, so treat them as context, not as direc
 | --- | --- |
 | E1 | A learned router beats the hashed-feature baseline in accuracy and macro-F1 with non-overlapping confidence intervals, in both the full and 10-shot settings, at under 20 ms per query |
 | E2 | Hybrid + rerank beats today's retriever on nDCG@10 with non-overlapping confidence intervals |
-| E3 | Program + verifier beats direct answering on accuracy, and its selective accuracy is clearly higher than direct accuracy, so that when FinSight answers it is right more often |
+| E3 | An agreement or grounding arm is right-when-answering clearly above the direct arm's accuracy (non-overlapping CIs) at a coverage FinSight can live with (for example ≥ 70%) |
 
 ## Known limits
 
