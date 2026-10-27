@@ -113,7 +113,7 @@ An earlier run (Qwen 2.5 3B, full report context, code arms without a reasoning 
 - Use bge-m3 dense retrieval.
 - Compute every number through code, and show a "verified" badge when two routes agree.
 
-## Run it on Kaggle## Run it on Kaggle
+## Run it on Kaggle
 
 1. Open [kaggle.com/code](https://www.kaggle.com/code) and choose **New Notebook**.
 2. Choose **File → Import Notebook**, then paste this link into the URL or GitHub field:
