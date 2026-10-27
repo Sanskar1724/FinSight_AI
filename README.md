@@ -35,7 +35,7 @@ These numbers come from different setups, so treat them as context, not as direc
    `https://raw.githubusercontent.com/Sanskar1724/FinSight_AI/research/part-1-grounding-benchmarks/part1_grounding_benchmarks.ipynb`
 3. In the right panel, set **Accelerator → GPU T4 x2** and **Internet → On**. Internet needs a phone-verified Kaggle account.
 4. For a quick check, set `FAST = True` in the first code cell and choose **Run All**. That takes about 10 minutes.
-5. For the real results, set `FAST = False` and use **Save Version → Save & Run All (Commit)**, so the run continues in the background. A full run takes roughly 1–1.5 hours on a T4.
+5. For the real results, set `FAST = False` and use **Save Version → Save & Run All (Commit)**, so the run continues in the background. A full run takes about 50–60 minutes on one T4. Once E1 is done, set `RUN_E1_ROUTING = False` to skip it.
 6. Download `part1_results/` from the notebook's **Output** tab.
 
 ### Settings worth trying
@@ -43,7 +43,7 @@ These numbers come from different setups, so treat them as context, not as direc
 | Setting | Default | Try |
 | --- | --- | --- |
 | `LLM_NAME` | `Qwen/Qwen2.5-3B-Instruct` | `Qwen/Qwen2.5-7B-Instruct` with `LLM_4BIT = True` for stronger numeric results |
-| `FINQA_N` | 400 | 1147 for the full FinQA test set (about 3× longer) |
+| `FINQA_N` | 200 | 1147 for the full FinQA test set (about 5× longer) |
 | `EMBED_MODELS` | `bge-small-en-v1.5`, `bge-m3` | Add `BAAI/bge-base-en-v1.5` or a finance-tuned embedding model |
 | `RERANKER_MODEL` | `BAAI/bge-reranker-base` | `BAAI/bge-reranker-v2-m3` (multilingual, slower) |
 
