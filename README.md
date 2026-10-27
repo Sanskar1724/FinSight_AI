@@ -18,6 +18,46 @@ Part 1 asks one question: **do FinSight's three grounding components get measura
 
 All results include 95% bootstrap confidence intervals, timing per query, and the exact configuration, so they can go straight into the paper's tables.
 
+## Technical approach
+
+```text
+part1_grounding_benchmarks.ipynb
+├── 0 Configuration      FAST mode, seeds, model names, sample sizes
+├── 1 Setup              installs, downloads with a local cache, bootstrap CIs, result writers
+│   └── FinSight port    exact copy of knowledge.py hashing (256-dim signed feature hashing,
+│                        unigrams + bigrams, log term weights, L2 norm, +0.35 keyword overlap)
+├── E1 Routing           Banking77 → features → classifier → accuracy / macro-F1
+├── E2 Retrieval         FiQA → index → rank top 100 → nDCG@10 / MRR@10 / Recall@100
+├── E3 Numeric           FinQA → LLM arms → sandboxed execution → checks → scoring
+└── Summary              summary.csv, results.json, per-item files, summary.png
+```
+
+**E1 · Routing**
+- **Features:** FinSight hashed bag-of-words, TF-IDF (word 1–2-grams plus character 3–5-grams), and sentence embeddings (`bge-small-en-v1.5`, `bge-m3`, L2-normalised, fp16 on GPU).
+- **Classifiers:** nearest intent centroid (cosine), and multinomial logistic regression (C = 10).
+- **Regimes:** full training data, plus 5 and 10 examples per intent, each averaged over 3 seeded draws.
+- **Timing:** time per query includes encoding.
+
+**E2 · Retrieval**
+- **FinSight (current):** hashed cosine + 0.35 × query-token overlap, scored in sparse matrix form.
+- **BM25:** a sparse-matrix implementation (k1 = 1.2, b = 0.75).
+- **Dense:** bi-encoder cosine; `bge-small` uses its query instruction; document embeddings are cached to disk.
+- **Hybrid:** reciprocal-rank fusion (k = 60) of BM25 and the best dense run.
+- **Rerank:** cross-encoder over the hybrid top 50, with the tail kept so Recall@100 stays comparable.
+- **Robustness:** every method runs inside an error guard, and results are saved after each step.
+
+**E3 · Numeric grounding**
+- **Model and decoding:** one instruction-tuned LLM (Qwen 2.5 7B in 4-bit, with a 3B fp16 fallback) with greedy decoding. Prompts are batched by length, and every generation is cached.
+- **Context:** FinQA gold supporting facts (`gold`) or the whole report (`full`).
+- **Arm A:** the model reasons, then prints `Answer: <number>`.
+- **Arm B:** the model reasons, then writes Python that sets `ans`, run in a sandbox with restricted builtins, no imports and a 3-second time limit.
+- **Arm C:** B plus a grounding check. Every numeric constant in the program must appear in the context, allowing for small constants, % and fraction forms, and 10^3 / 10^6 / 10^9 scaling. A failure triggers one retry with the reason stated; a second failure means the system abstains.
+- **Arms D and E:** answer only when A agrees with B (D) or with C (E), within 1% relative tolerance, with %/fraction equivalence.
+- **Scoring:** FinQA execution accuracy with 1% relative tolerance, applied the same way to all arms.
+- **Metrics:** accuracy, coverage, and right-when-answering, each with a 95% bootstrap CI.
+
+**Reproducibility:** fixed seed 13, pinned dataset sources, model names recorded in `results.json`, and all raw generations saved in `e3_items.jsonl`.
+
 ### Reference points from the literature
 
 - **Banking77:** the dataset paper reports about 93% accuracy for its best full-data intent models, and a drop of about 8 points with 10 examples per intent ([Casanueva et al., 2020](https://arxiv.org/abs/2003.04807)).
