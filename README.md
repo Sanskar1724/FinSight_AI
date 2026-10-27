@@ -26,13 +26,54 @@ All results include 95% bootstrap confidence intervals, timing per query, and th
 
 These numbers come from different setups, so treat them as context, not as direct comparisons. The fair comparison in each experiment is against the row marked **(current)**, which is what FinSight runs today.
 
-## Results so far
+## Results (Part 1 complete, 27 Oct 2026, Kaggle Tesla T4)
 
-**E1 (final, run 1):** on 3,080 Banking77 test questions, FinSight's current representation scores 65.5% (full data), 52.5% (10 per intent) and 45.1% (5 per intent). `bge-small-en-v1.5` + logistic regression scores 93.3%, 86.8% and 82.8%; `bge-m3` is statistically tied. E1 is switched off by default now.
+**E1 · Routing (Banking77, 3,080 test queries), accuracy with 95% CI**
 
-**E3 (run 2, Qwen 2.5 3B, full report context, code arms without a reasoning step):** direct 59.0%, program 48.5%, program + grounding check 46.8% (93% coverage, 50.3% right when answering). The code arms were disadvantaged because only the direct arm could reason first. Run 3 fixes that, adds the agreement arms, handles % and scale in the grounding check, and uses the gold context and a 7B model.
+| Method | Full data | 10 per intent | 5 per intent |
+| --- | --- | --- | --- |
+| FinSight hashed BoW + centroid (current) | 65.5% (63.8–67.2) | 52.5% | 45.1% |
+| TF-IDF word+char + logistic regression | 91.2% | 74.3% | 64.5% |
+| bge-small-en-v1.5 + logistic regression | 93.3% (92.5–94.3) | 86.8% | 82.8% |
+| bge-m3 + logistic regression | 93.4% (92.5–94.3) | 87.5% | 83.8% |
 
-## Run it on Kaggle
+**E2 · Retrieval (FiQA-2018, 57,638 documents, 648 test queries)**
+
+| Method | nDCG@10 (95% CI) | MRR@10 | Recall@100 |
+| --- | --- | --- | --- |
+| FinSight hashed BoW + overlap (current) | 0.127 (0.109–0.144) | 0.173 | 0.329 |
+| BM25 | 0.236 (0.211–0.260) | 0.294 | 0.509 |
+| Dense bge-small-en-v1.5 | 0.399 (0.373–0.426) | 0.484 | 0.688 |
+| **Dense bge-m3** | **0.410 (0.382–0.438)** | **0.500** | **0.708** |
+| Hybrid RRF (BM25 + bge-m3) | 0.361 (0.332–0.387) | 0.441 | 0.694 |
+| Hybrid + rerank (bge-reranker-base, top 50) | 0.351 (0.324–0.377) | 0.421 | 0.694 |
+
+Our BM25 reproduces the BEIR paper's 0.236 exactly. Dense bge-m3 is 3.2× today's retriever. Equal-weight fusion with the much weaker BM25 and a base-size reranker both lowered quality on FiQA.
+
+**E3 · Numeric grounding (FinQA test, 300 questions, gold supporting-fact context)**
+
+| Arm | Accuracy (95% CI) | Coverage | Right when answering (95% CI) |
+| --- | --- | --- | --- |
+| A · Direct answer (with reasoning) | 48.7% (43.3–54.3) | 100% | 48.7% |
+| B · Reason, then program | 71.0% (66.0–76.0) | 98.3% | 72.2% (67.1–77.0) |
+| C · Program + grounding check | 71.7% (66.7–76.7) | 98.7% | 72.6% (67.6–77.7) |
+| D · Agreement (A = B) | 39.7% | 48.0% | 82.6% (76.4–88.2) |
+| E · Agreement + grounding (A = C) | 40.0% | 48.3% | 82.8% (77.2–88.3) |
+
+- Computing through a program beats stating the answer by about 22 points.
+- The grounding check adds little, because errors are mostly a wrong row or formula, not invented numbers.
+- Agreement between two routes gives a high-confidence tier: about 83% correct on the half of questions where the routes agree.
+
+Gold context is an oracle-retrieval setting, so these numbers are not directly comparable with the original FinQA paper's full-pipeline 61.2%.
+
+An earlier run (Qwen 2.5 3B, full report context, code arms without a reasoning step) gave direct 59.0%, program 48.5% and program + check 46.8%. Letting the code arms reason first reversed that result.
+
+**Decisions for FinSight:**
+- Use an embedding router (bge-small for English, bge-m3 for Hinglish).
+- Use bge-m3 dense retrieval.
+- Compute every number through code, and show a "verified" badge when two routes agree.
+
+## Run it on Kaggle## Run it on Kaggle
 
 1. Open [kaggle.com/code](https://www.kaggle.com/code) and choose **New Notebook**.
 2. Choose **File → Import Notebook**, then paste this link into the URL or GitHub field:
