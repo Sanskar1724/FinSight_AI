@@ -1,0 +1,574 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>FinSight Multi-Agent Research</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Serif:wght@500;600&display=swap">
+<style>
+/* Layout: research dossier. Sticky contents rail on wide screens, single reading column on phones. */
+:root {
+  --bg: #f6f8f7;
+  --surface: #ffffff;
+  --fg: #17211f;
+  --muted: #56645f;
+  --rule: #d7dfdc;
+  --accent: #0c6b58;
+  --accent-soft: #e2f0eb;
+  --mark: #b06a00;
+  --display: "IBM Plex Serif", Georgia, "Times New Roman", serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0f1514; --surface: #151d1b; --fg: #e4ebe8; --muted: #9aaaa4; --rule: #2a3633;
+  --accent: #5ccfae; --accent-soft: #17302a; --mark: #f0b45a; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #0f1514; --surface: #151d1b; --fg: #e4ebe8; --muted: #9aaaa4; --rule: #2a3633;
+  --accent: #5ccfae; --accent-soft: #17302a; --mark: #f0b45a; color-scheme: dark; }
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font: 16px/1.65 var(--body); }
+.wrap { max-width: 1180px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 40px 80px; }
+header.hero { border-bottom: 1px solid var(--rule); padding-bottom: 28px; margin-bottom: 36px; }
+.eyebrow { font: 500 12px/1.4 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+h1 { font: 600 clamp(30px, 5vw, 46px)/1.12 var(--display); margin: 10px 0 14px; text-wrap: balance; max-width: 24ch; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px 20px; font: 13px/1.5 var(--mono); color: var(--muted); }
+.layout { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 56px; }
+nav.toc { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 24px); align-self: start; font-size: 14px; }
+nav.toc .label { font: 500 11px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin-bottom: 12px; }
+nav.toc ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; counter-reset: s; }
+nav.toc li { counter-increment: s; display: grid; grid-template-columns: 22px 1fr; }
+nav.toc li::before { content: counter(s); font: 12px/1.6 var(--mono); color: var(--accent); }
+nav.toc a { color: var(--fg); text-decoration: none; line-height: 1.4; }
+nav.toc a:hover { color: var(--accent); }
+article { min-width: 0; max-width: 72ch; }
+article h2 { font: 600 clamp(22px, 3vw, 28px)/1.25 var(--display); margin: 56px 0 14px; padding-top: 18px;
+  border-top: 2px solid var(--fg); text-wrap: balance; scroll-margin-top: 20px; }
+article h3 { font: 600 18px/1.35 var(--body); margin: 32px 0 8px; text-wrap: balance; scroll-margin-top: 20px; }
+article p, article li { color: var(--fg); }
+article p { margin: 0 0 14px; }
+article ul, article ol { padding-left: 22px; margin: 0 0 16px; display: grid; gap: 6px; }
+p.lede { font-size: 18px; line-height: 1.6; padding: 20px 22px; background: var(--surface);
+  border: 1px solid var(--rule); border-radius: 6px; }
+article a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+article a:focus-visible, nav a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+strong { font-weight: 600; }
+code { font: .88em var(--mono); background: var(--accent-soft); padding: 1px 5px; border-radius: 3px; overflow-wrap: anywhere; }
+pre { background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 14px; overflow-x: auto; }
+pre code { background: none; padding: 0; overflow-wrap: normal; }
+.tbl { overflow-x: auto; margin: 6px 0 22px; border: 1px solid var(--rule); border-radius: 6px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 14px; line-height: 1.5; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; vertical-align: top; padding: 9px 12px; border-bottom: 1px solid var(--rule); }
+th { font: 500 12px/1.4 var(--mono); letter-spacing: .04em; text-transform: uppercase; color: var(--muted); background: var(--bg); }
+tr:last-child td { border-bottom: 0; }
+blockquote { margin: 0 0 16px; padding: 4px 16px; border-left: 3px solid var(--mark); color: var(--muted); }
+hr { border: 0; border-top: 1px solid var(--rule); margin: 32px 0; }
+@media (max-width: 880px) {
+  .layout { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  nav.toc { position: static; border: 1px solid var(--rule); border-radius: 6px; padding: 16px; background: var(--surface); }
+}
+@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+</style>
+<div class="wrap">
+  <header class="hero">
+    <div class="eyebrow">FinSight_AI · Research brief 01</div>
+    <h1>Make FinSight_AI&#x27;s agents earn their place</h1>
+    <div class="meta"><span>27 Oct 2026</span><span>Prepared for San</span><span>Scope: industry, academia, benchmarks, architecture, paper plan</span></div>
+  </header>
+  <div class="layout">
+    <nav class="toc" aria-label="Contents"><div class="label">Contents</div><ol>
+<li><a href="#industry-converged-on-llm-as-interface-deterministic-systems-as-authority">Industry converged on "LLM as interface, deterministic systems as authority"</a></li>
+<li><a href="#twenty-plus-finance-benchmarks-exist-and-none-scores-a-household-ledger">Twenty-plus finance benchmarks exist, and none scores a household ledger</a></li>
+<li><a href="#a-routed-verified-architecture-grows-directly-from-finsights-existing-modules">A routed, verified architecture grows directly from FinSight's existing modules</a></li>
+<li><a href="#the-papers-contribution-is-the-verified-ledger-benchmark-plus-an-honest-multi-agent-ablation">The paper's contribution is the verified-ledger benchmark plus an honest multi-agent ablation</a></li>
+<li><a href="#conclusion">Conclusion</a></li>
+    </ol></nav>
+    <article>
+<p class="lede">FinSight_AI should grow into a multi-agent personal finance assistant in a specific way: one assistant persona in front, a router that hands questions to specialist agents, every agent calling one shared deterministic Decimal engine through typed tools, and a numeric-faithfulness verifier checking every answer before the user sees it. The multi-agent layer should be treated as a hypothesis to test, not as the contribution itself. That design follows what the best-documented industry systems already do. Wells Fargo's Fargo uses an LLM only for intent and entity extraction, and "the bank's APIs do not pass through the LLM" (<a href="https://www.venturebeat.com/ai/wells-fargos-ai-assistant-just-crossed-245-million-interactions-with-zero-humans-in-the-loop-and-zero-pii-to-the-llm" target="_blank" rel="noopener">VentureBeat</a>). It also takes the evidence against free-form multi-agent systems seriously: across 1,642 traces from seven frameworks, those systems failed on <strong>41–86.7% of tasks</strong>, often with "minimal" gains over single-agent baselines (<a href="https://arxiv.org/html/2503.13657v3" target="_blank" rel="noopener">MAST, arXiv 2503.13657</a>). The publishable gap is clear and, as far as these notes could find, open. Public finance benchmarks test corporate filings (FinanceBench, FinQA, Vals Finance Agent), trading (InvestorBench) or Chinese and regulatory QA. None tests an agent over a <strong>private, per-user ledger</strong> with verified gold numbers, consent and role constraints, Indian payment rails, and a component-by-component multi-agent ablation. The repository already holds most of the pieces for such a paper: a deterministic engine (<code>backend/app/services/finance.py</code>), a grounded assistant with evidence (<code>ai_context.py</code>, <code>ai_service.py</code>), and a research lab (<code>research.py</code>, <code>docs/RESEARCH.md</code>). What it lacks is evaluation rigor (a lexical rubric over 28 cases), real integrations (CSV only), and user management beyond single accounts. The recommended paper is a benchmark-plus-system paper. Its headline claim would be that verified, tool-grounded routing beats both LLM-only and free-form multi-agent designs on accuracy, consistency, leakage and cost, with honest reporting wherever multi-agent orchestration does not help.</p>
+<h2 id="industry-converged-on-llm-as-interface-deterministic-systems-as-authority">Industry converged on "LLM as interface, deterministic systems as authority"</h2>
+<h3 id="bank-assistants-hide-specialists-behind-one-persona">Bank assistants hide specialists behind one persona</h3>
+<p>Bank assistants run at very large scale, and their designs are conservative. Bank of America's Erica had <strong>20.6 million users and nearly 700 million interactions in 2025</strong>, but BofA discloses no model, vendor or resolution rate (<a href="https://newsroom.bankofamerica.com/content/newsroom/press-releases/2026/03/bofa-ai-and-digital-innovations-fuel-30-billion-client-interacti.html" target="_blank" rel="noopener">BofA Newsroom</a>). Wells Fargo's Fargo is the best-documented architecture:</p>
+<ol>
+<li>Speech-to-text runs on the device.</li>
+<li>A small model detects PII, and the text is scrubbed and tokenized.</li>
+<li>Gemini Flash 2.0 performs only intent and entity extraction.</li>
+<li>All computation stays on bank systems.</li>
+</ol>
+<p>The bank calls itself "the filters in front and behind". Interactions grew from 21.3M in 2023 to <strong>245.4M in 2024</strong> (<a href="https://www.venturebeat.com/ai/wells-fargos-ai-assistant-just-crossed-245-million-interactions-with-zero-humans-in-the-loop-and-zero-pii-to-the-llm" target="_blank" rel="noopener">VentureBeat</a>). Wells Fargo's genuinely multi-agent work happens behind the scenes. A LangGraph-based network re-underwrote 15 years of loan documents with one job per agent (retrieve, extract, match to system of record, calculate), and a human reviewed only the final output (<a href="https://www.venturebeat.com/ai/wells-fargos-ai-assistant-just-crossed-245-million-interactions-with-zero-humans-in-the-loop-and-zero-pii-to-the-llm" target="_blank" rel="noopener">VentureBeat</a>). Intuit likewise runs "select AI agents across its platform", but users see one Intuit Assist (<a href="https://techcrunch.com/2025/11/18/intuit-signs-100m-deal-with-openai-to-bring-its-apps-to-chatgpt" target="_blank" rel="noopener">TechCrunch</a>). The researchers found <strong>no consumer product that shows users multiple named bots</strong>. In practice, multi-agent design is an internal implementation choice.</p>
+<p>Indian bank assistants are narrower still. HDFC's EVA, built by Senseforth in 2017, answers FAQ-style questions about products, fees and IFSC codes (<a href="https://www.analyticsindiamag.com/hdfc-banks-eva-becomes-indias-largest-smartest-chatbot/" target="_blank" rel="noopener">Analytics India Magazine</a>). Coverage of SBI's YONO 2.0 mentions a unified code base for about 100M customers but no AI assistant features (<a href="https://www.theweek.in/wire-updates/business/2025/12/14/dcm18-biz-sbi-yono.html" target="_blank" rel="noopener">The Week/PTI</a>). The researchers found no public evidence of LLM-based advisory features in Indian bank apps.</p>
+<h3 id="fintechs-moved-from-chat-to-action-but-none-publishes-how-it-checks-numbers">Fintechs moved from chat to action, but none publishes how it checks numbers</h3>
+<p>From 2025 to 2026, fintech assistants started taking actions. Products separate information from action and limit actions to narrow, reversible operations:</p>
+<ul>
+<li><strong>Revolut AIR</strong> (April 2026) reads only data the user can already see. It can manage subscriptions, freeze cards and buy eSIMs, and Revolut claims zero data retention (<a href="https://www.revolut.com/news/revolut_enters_new_era_of_money_intelligence_with_launch_of_ai_assistant/" target="_blank" rel="noopener">Revolut</a>).</li>
+<li><strong>Robinhood Cortex</strong> helps build trades but <strong>does not execute them</strong> (<a href="https://www.benzinga.com/25/03/44530226/robinhood-launches-ai-investment-tool-cortex-to-expand-market-analysis-access-a-premium-research-assistant-right-" target="_blank" rel="noopener">Benzinga</a>).</li>
+<li><strong>Public's "Agentic Brokerage"</strong> splits into Research, Creation and Action pillars, and its announcement describes no guardrails (<a href="https://fxnewsgroup.com/forex-news/retail-forex/public-introduces-new-phase-of-its-ai-vision-agentic-brokerage/" target="_blank" rel="noopener">FX News Group</a>).</li>
+</ul>
+<p>A second pattern has appeared in the same period: general LLMs acting as hubs that pull in finance apps.</p>
+<ul>
+<li><strong>Intuit</strong> put TurboTax, Credit Karma and QuickBooks inside ChatGPT under a deal worth over $100M (<a href="https://techcrunch.com/2025/11/18/intuit-signs-100m-deal-with-openai-to-bring-its-apps-to-chatgpt" target="_blank" rel="noopener">TechCrunch</a>).</li>
+<li><strong>ChatGPT's personal finance experience</strong> (May 2026) links accounts through Plaid's more than 12,000 institutions, and OpenAI says it is "not a replacement for professional financial advice" (<a href="https://www.pymnts.com/artificial-intelligence-2/2026/chatgpt-connects-financial-accounts-to-deliver-personal-finance-insights/" target="_blank" rel="noopener">PYMNTS</a>).</li>
+<li><strong>Monarch MCP</strong> (October 2026) exposes a user's Monarch data to Claude and ChatGPT (<a href="https://www.monarch.com/whats-new" target="_blank" rel="noopener">Monarch</a>).</li>
+</ul>
+<p><strong>None of these products publishes how it verifies the numbers its assistant states.</strong> That gap is the most defensible position a research prototype can claim.</p>
+<h3 id="robo-advisors-are-rules-engines-and-indian-robos-are-mostly-distribution-platforms">Robo-advisors are rules engines, and Indian "robos" are mostly distribution platforms</h3>
+<p>US robo-advisors are SEC-registered advisers running rules-based allocation, rebalancing and tax-loss harvesting. Their growth is increasingly in cash: <strong>53% of Wealthfront's $88.2B platform assets</strong> were cash management as of July 2025 (<a href="https://www.renaissancecapital.com/IPO-Center/News/115274/investing-robo-advisor-wealthfront-sets-terms-for-450-million-ipo" target="_blank" rel="noopener">Renaissance Capital</a>). India's leaders are mainly execution and distribution platforms for direct mutual funds rather than discretionary advisers. Groww's clients held ₹1.1 trillion in MF AUM, and Groww captures about 39% of direct-plan SIP inflows (<a href="https://www.business-standard.com/amp/markets/mutual-fund/groww-drhp-reveals-mf-clout-125091701274_1.html" target="_blank" rel="noopener">Business Standard</a>). Regulation constrains what FinSight_AI can claim:</p>
+<ul>
+<li>SEBI's December 2024 amendment requires investment advisers to disclose their use of AI (<a href="https://taxmann.com/post/blog/sebi-mandates-investment-advisers-to-disclose-use-of-ai-tools-to-clients-in-providing-investment-advice" target="_blank" rel="noopener">Taxmann</a>).</li>
+<li>SEBI's February 2025 amendment makes regulated entities <strong>"solely responsible" for AI output</strong> (<a href="https://lexplosion.in/sebi-issues-guidelines-on-ai-usage-entities-using-ai-ml-tools-responsible-for-data-security-ai-generated-outputs-and-compliance-with-applicable-laws/" target="_blank" rel="noopener">Lexplosion</a>).</li>
+<li>The SEC fined Delphia and Global Predictions for "AI washing" (<a href="https://www.sec.gov/newsroom/press-releases/2024-36" target="_blank" rel="noopener">SEC 2024-36</a>).</li>
+</ul>
+<p>The paper and the product must therefore never claim abilities the engine lacks. FinSight's existing <code>unsupported_advice</code> refusal intent is an asset here, not a limitation.</p>
+<h3 id="account-aggregation-the-us-is-a-cautionary-tale-and-indias-aa-is-the-right-rail-but-a-licensed-one">Account aggregation: the US is a cautionary tale and India's AA is the right rail but a licensed one</h3>
+<p>In the US, aggregation still mixes credential scraping with token-based APIs. The rules are unsettled:</p>
+<ul>
+<li>The CFPB's Section 1033 rule is <strong>enjoined and under reconsideration</strong>, so its April 2026 compliance date triggered nothing (<a href="https://www.cozen.com/news-resources/publications/2026/section-1033-compliance-date-open-banking-rule-enjoined-and-under-reconsideration" target="_blank" rel="noopener">Cozen O'Connor</a>).</li>
+<li>FDX is the recognized standard-setter through 2030 (<a href="https://www.openbankingtracker.com/guides/section-1033-status" target="_blank" rel="noopener">Open Banking Tracker</a>).</li>
+<li>JPMorgan now charges Plaid for data that used to be free (<a href="https://www.bankingdive.com/news/plaid-pay-jpmorgan-data-open-banking-fintech/760264/" target="_blank" rel="noopener">Banking Dive</a>).</li>
+<li>Plaid paid <strong>$58M</strong> to settle claims that it collected bank credentials through login screens styled like banks' own (<a href="https://www.jurist.org/news/2021/08/plaid-agrees-to-pay-58-million-in-data-privacy-class-action-lawsuit/" target="_blank" rel="noopener">JURIST</a>).</li>
+</ul>
+<p>The UK shows what a mandated API regime looks like at maturity: 18.8M user connections and <strong>99.80% weighted API availability</strong> in June 2026 (<a href="https://www.openbanking.org.uk/news/open-banking-surpasses-one-billion-payments-and-100-billion-api-calls/" target="_blank" rel="noopener">Open Banking Ltd</a>). The EU's PSD3/PSR targets PSD2's shortcomings. It requires permission dashboards and API performance "at least as good as" the bank's own app, but most rules apply only from about 2028 (<a href="https://www.openbankingtracker.com/guides/psd3-psr-readiness" target="_blank" rel="noopener">Open Banking Tracker</a>).</p>
+<p>India's Account Aggregator (AA) framework is consent-native and large:</p>
+<ul>
+<li>More than <strong>500M fulfilled consents</strong> and more than 310M customer-linked accounts by September 2026 (<a href="https://sahamati.org.in/media-article/account-aggregator-crosses-500-million-consents-as-india-marks-5th-aa-foundation-day/" target="_blank" rel="noopener">Sahamati</a>).</li>
+<li>About 7.69M personal-finance-management customers were served in FY25 (<a href="https://www.business-standard.com/amp/finance/news/nbfcs-lead-account-aggregator-consents-in-fy25-with-60-share-125100600872_1.html" target="_blank" rel="noopener">Business Standard</a>).</li>
+</ul>
+<p>It has three shortcomings that matter for FinSight:</p>
+<ul>
+<li><strong>Only regulated entities can be data users (FIUs).</strong> They must be regulated by RBI, SEBI, IRDAI or PFRDA (<a href="https://docs.setu.co/data/account-aggregator/licenses-and-go-live/licenses" target="_blank" rel="noopener">Setu docs</a>).</li>
+<li><strong>Coverage is uneven.</strong> A vendor blog, which sells a competing product, reports that only about 40% of banks expose fixed deposits and that joint and NRE accounts are unsupported (<a href="https://casparser.in/blog/state-of-account-aggregator-2026/" target="_blank" rel="noopener">CASParser</a>).</li>
+<li><strong>Reliability is uneven.</strong> Fetches can fail or be 1–2 days stale (<a href="https://docs.fold.money/introduction-to-aa-for-fintechs" target="_blank" rel="noopener">Fold docs</a>).</li>
+</ul>
+<p>RBI has ordered AA interoperability by 31 December 2026, but the architecture and liability rules are still unresolved (<a href="https://www.medianama.com/2026/10/223-sahamati-bg-mahesh-rbi-account-aggregator-interoperability/" target="_blank" rel="noopener">MediaNama</a>). UPI handles about 24B transactions a month (<a href="https://startuptalky.com/india-upi-transactions-september-2026/" target="_blank" rel="noopener">StartupTalky</a>). The researchers believe it offers no read API to third-party personal-finance apps but could not verify this, so UPI visibility realistically comes through bank statements. India's DPDP Rules make FinSight a data fiduciary. Consent-manager registration begins around November 2026, and the main duties (notice, consent, 72-hour breach reporting, erasure) start around <strong>May 2027</strong> (<a href="https://www.mirvolegal.com/insights/dpdp-rules-2025-compliance-timeline/" target="_blank" rel="noopener">MirvoLegal</a>).</p>
+<p>Integration also depends on categorizing transactions, and that remains hard. Intuit's 2025 QuickBooks paper reports <strong>68.67% top-1 few-shot</strong> and <strong>45.52% zero-shot</strong> accuracy (<a href="https://arxiv.org/pdf/2506.09234" target="_blank" rel="noopener">arXiv 2506.09234</a>). Plaid claims only relative gains of "up to 10%" (<a href="https://plaid.com/blog/ai-enhanced-transaction-categorization/" target="_blank" rel="noopener">Plaid</a>). The researchers found no Indian categorization benchmark.</p>
+<h3 id="academic-agents-target-trading-and-their-headline-results-do-not-survive-scrutiny">Academic agents target trading, and their headline results do not survive scrutiny</h3>
+<p>Academic finance agents almost all target trading or equity research:</p>
+<ul>
+<li><strong>TradingAgents</strong> uses analyst, debating-researcher, trader and risk roles (<a href="https://arxiv.org/abs/2412.20138" target="_blank" rel="noopener">arXiv 2412.20138</a>).</li>
+<li><strong>FinCon</strong> uses a manager-analyst hierarchy (<a href="https://arxiv.org/abs/2407.06567" target="_blank" rel="noopener">arXiv 2407.06567</a>).</li>
+<li><strong>FinMem</strong> uses layered memory (<a href="https://arxiv.org/abs/2311.13743" target="_blank" rel="noopener">arXiv 2311.13743</a>).</li>
+<li><strong>FinRobot</strong> is a layered agent platform (<a href="https://arxiv.org/abs/2405.14767" target="_blank" rel="noopener">arXiv 2405.14767</a>).</li>
+</ul>
+<p>Critics have since taken these results apart. "The Alpha Illusion" finds that <strong>35 of 40 system-by-friction-component cells are unmodelled</strong> across five well-known frameworks. In the authors' reproduction, TradingAgents' Sharpe ratio falls from 0.43 to 0.22 after costs, below buy-and-hold. The paper also cites evidence that multi-agent debate wins only <strong>about 20% of the time across 36 configurations</strong> (<a href="https://arxiv.org/abs/2605.16895" target="_blank" rel="noopener">arXiv 2605.16895</a>). FINSABER reports that FinMem's return drops by about 72% once the test window passes the model's knowledge cutoff (<a href="https://arxiv.org/html/2505.07078v5" target="_blank" rel="noopener">arXiv 2505.07078</a>). The Alpha Illusion's prescription matches FinSight's existing design: use LLMs as <strong>"auditable upstream information interfaces"</strong>, with calculation and risk in independent modules that can override them (<a href="https://arxiv.org/abs/2605.16895" target="_blank" rel="noopener">arXiv 2605.16895</a>).</p>
+<p>On personal finance specifically, three independent lines of evidence say unconstrained LLMs are unreliable advisers, and users cannot tell when they are wrong:</p>
+<ul>
+<li><strong>Literacy tests.</strong> Ten models averaged <strong>68.47%</strong> on literacy tests (<a href="https://arxiv.org/pdf/2412.19784" target="_blank" rel="noopener">arXiv 2412.19784</a>).</li>
+<li><strong>Simulated advice.</strong> GPT-5.2's advice in a life-cycle simulation relied on heuristics, never rebalanced, and varied by a median of about <strong>$3,220 in annual consumption</strong> across repeated identical queries. Roughly a third of the gender equity gap was supply-side bias (<a href="https://arxiv.org/html/2608.01607v1" target="_blank" rel="noopener">arXiv 2608.01607</a>).</li>
+<li><strong>User trust.</strong> In a 64-person lab study, user trust was insensitive to advice quality and sometimes moved inversely with it (<a href="https://arxiv.org/abs/2504.05862v2" target="_blank" rel="noopener">arXiv 2504.05862</a>).</li>
+</ul>
+<p>The closest system analogue to FinSight is VeNRA. It parses documents into a typed fact ledger, has the LLM write code against that ledger, and uses a roughly 3B "Sentinel" model to audit execution traces (<a href="https://arxiv.org/html/2603.04663v1" target="_blank" rel="noopener">arXiv 2603.04663</a>).</p>
+<div class="tbl"><table>
+<thead>
+<tr>
+<th>Approach</th>
+<th>Representative</th>
+<th>What it solves</th>
+<th>Where it falls short for FinSight's problem</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Bank NLU assistant</td>
+<td>Fargo, Erica, EVA</td>
+<td>Scale; PII kept from the LLM; deterministic APIs</td>
+<td>Single institution; no cross-account view; no public evaluation</td>
+</tr>
+<tr>
+<td>Fintech agent</td>
+<td>Revolut AIR, Cleo, Cortex</td>
+<td>Actions, voice, memory</td>
+<td>No published numeric verification; Cleo paid a $17M FTC settlement over deceptive claims (<a href="https://www.ftc.gov/news-events/news/press-releases/2025/03/cash-advance-company-cleo-ai-agrees-pay-17-million-result-ftc-lawsuit-charging-it-deceives-consumers" target="_blank" rel="noopener">FTC</a>)</td>
+</tr>
+<tr>
+<td>LLM hub plus aggregator</td>
+<td>ChatGPT + Plaid, Monarch MCP</td>
+<td>Breadth of data and apps</td>
+<td>Liability unclear; "not a replacement for professional financial advice"; US-centric</td>
+</tr>
+<tr>
+<td>Robo-advisor</td>
+<td>Wealthfront, Groww</td>
+<td>Rules-based allocation, distribution</td>
+<td>Narrow scope; little conversational grounding</td>
+</tr>
+<tr>
+<td>Aggregation rail</td>
+<td>Plaid, UK OB, India AA</td>
+<td>Data access</td>
+<td>Licensing (FIU), coverage gaps, fees, breakage</td>
+</tr>
+<tr>
+<td>Academic agent</td>
+<td>TradingAgents, FinCon, FinMem</td>
+<td>Role specialization, memory</td>
+<td>Trading-only; results collapse under realistic evaluation</td>
+</tr>
+<tr>
+<td>Verified-ledger system</td>
+<td>VeNRA</td>
+<td>Typed facts, code execution, sentinel</td>
+<td>Corporate documents, not household ledgers</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="twenty-plus-finance-benchmarks-exist-and-none-scores-a-household-ledger">Twenty-plus finance benchmarks exist, and none scores a household ledger</h2>
+<h3 id="document-qa-is-about-corporate-filings">Document QA is about corporate filings</h3>
+<p>Classic numerical QA sets now serve mainly as regression checks:</p>
+<ul>
+<li><strong>FinQA:</strong> 8,281 questions; at publication, human experts scored about 91% execution accuracy against about 61% for the best model (<a href="https://arxiv.org/abs/2109.00122" target="_blank" rel="noopener">arXiv 2109.00122</a>).</li>
+<li><strong>ConvFinQA:</strong> a multi-turn extension of FinQA (<a href="https://arxiv.org/abs/2210.03849" target="_blank" rel="noopener">arXiv 2210.03849</a>).</li>
+<li><strong>TAT-QA:</strong> 16,552 questions over hybrid table-plus-text contexts (<a href="https://arxiv.org/abs/2105.07624" target="_blank" rel="noopener">arXiv 2105.07624</a>).</li>
+</ul>
+<p>A 7B RL-trained model, Fin-R1, reports 76.0 on FinQA and 85.0 on ConvFinQA (<a href="https://arxiv.org/abs/2503.16252v2" target="_blank" rel="noopener">arXiv 2503.16252</a>). The harder sets are long-document and analyst-style:</p>
+<ul>
+<li><strong>FinanceBench:</strong> GPT-4-Turbo with retrieval answered incorrectly or refused <strong>81%</strong> of questions in the original study (<a href="https://arxiv.org/pdf/2311.11944" target="_blank" rel="noopener">arXiv 2311.11944</a>).</li>
+<li><strong>FinanceQA:</strong> frontier models scored 31–49% exact match. On questions that require the model to generate its own assumptions, every model scored only <strong>2.2–4.3%</strong> (<a href="https://arxiv.org/pdf/2501.18062" target="_blank" rel="noopener">arXiv 2501.18062</a>).</li>
+<li><strong>DocFinQA:</strong> pairs each question with a full filing averaging about 123k words (<a href="https://arxiv.org/html/2401.06915v3" target="_blank" rel="noopener">arXiv 2401.06915</a>).</li>
+<li><strong>SEC-QA:</strong> program-of-thought or agentic methods reach up to 80% exact match, against 30–55% for generic RAG (<a href="https://arxiv.org/html/2406.14394v1" target="_blank" rel="noopener">arXiv 2406.14394</a>).</li>
+</ul>
+<p>Every one of these sets is built on US corporate disclosures. None contains bank statements, UPI narrations, payslips or budgets.</p>
+<h3 id="broad-suites-are-mostly-classification-extraction-and-qa">Broad suites are mostly classification, extraction and QA</h3>
+<p>FinBen covers 36 datasets across 24 tasks (<a href="https://arxiv.org/abs/2402.12659" target="_blank" rel="noopener">arXiv 2402.12659</a>). FinMTEB evaluates embeddings and is directly useful for replacing FinSight's hashed retriever (<a href="https://arxiv.org/abs/2502.10990" target="_blank" rel="noopener">arXiv 2502.10990</a>). FinSearchComp's three task types (time-sensitive fetching, simple historical lookup, complex investigation) give a good template for difficulty tiers, and its LLM judge agreed with humans about 95% of the time (<a href="https://arxiv.org/html/2509.13160v1" target="_blank" rel="noopener">arXiv 2509.13160</a>). Many suites are Chinese-language: FinEval, CFLUE, BizFinBench, FinGAIA.</p>
+<h3 id="agent-benchmarks-have-no-banking-or-personal-finance-domain">Agent benchmarks have no banking or personal-finance domain</h3>
+<p>The Vals AI Finance Agent Benchmark v2.1 is the most current independent finance-agent leaderboard:</p>
+<ul>
+<li>449 private test questions, plus a public set of 27.</li>
+<li>Severity-weighted partial credit, with "dealbreaker" facts that zero out an answer.</li>
+<li>A three-LLM jury grades answers.</li>
+<li>Cost and latency are reported for each test.</li>
+</ul>
+<p>On 26 October 2026 the leaders were clustered at <strong>67–68%</strong>, with costs ranging up to <strong>$8.91 per test</strong> (<a href="https://www.vals.ai/benchmarks/fabv2-1" target="_blank" rel="noopener">Vals AI</a>). tau2-bench introduced dual-control simulated users and <strong>pass^k</strong>, the probability that all k independent trials succeed. Dual control cut pass^1 by 18–25% (<a href="https://arxiv.org/pdf/2506.07982" target="_blank" rel="noopener">arXiv 2506.07982</a>), but the benchmark has no banking domain, and its telecom scores are near ceiling on aggregator leaderboards whose rows are not comparable with one another (<a href="https://benchlm.ai/benchmarks/tau2-bench" target="_blank" rel="noopener">benchlm.ai</a>). FinGAIA's best agent scored 48.9% against 84.7 for financial experts (<a href="https://arxiv.org/html/2507.17186v2" target="_blank" rel="noopener">arXiv 2507.17186</a>).</p>
+<h3 id="safety-and-indian-benchmarks">Safety and Indian benchmarks</h3>
+<p>Safety benchmarks exist for detecting financial hallucinations and for prompt injection:</p>
+<ul>
+<li><strong>PHANTOM</strong> tests hallucination detection in long-context financial QA (<a href="https://neurips.cc/virtual/2025/poster/121830" target="_blank" rel="noopener">NeurIPS 2025</a>).</li>
+<li><strong>AgentDojo</strong> has 629 security cases, including a banking suite (<a href="https://arxiv.org/abs/2406.13352" target="_blank" rel="noopener">arXiv 2406.13352</a>).</li>
+<li><strong>InjecAgent</strong> has 1,054 indirect-injection cases, some involving unauthorized transfers (<a href="https://arxiv.org/abs/2403.02691" target="_blank" rel="noopener">arXiv 2403.02691</a>).</li>
+<li><strong>AgentLeak</strong> measures privacy leakage through inter-agent messages and shared memory, not only through final outputs (<a href="https://arxiv.org/html/2602.11510v1" target="_blank" rel="noopener">arXiv 2602.11510</a>).</li>
+</ul>
+<p>The researchers found <strong>no benchmark for advice suitability, lending fairness or household consent</strong>. For India, IndiaFinBench is the only verified public benchmark grounded in Indian regulation: 406 SEBI and RBI questions, best model 89.7%, non-specialist human 69.0% (<a href="https://arxiv.org/abs/2604.19298" target="_blank" rel="noopener">arXiv 2604.19298</a>). Nothing covers ITR regime choice, UPI disputes or INR household budgeting.</p>
+<h3 id="evaluation-practice-has-moved-past-finsights-lexical-rubric">Evaluation practice has moved past FinSight's lexical rubric</h3>
+<p>Current finance evaluations use four practices that FinSight's lab does not yet use:</p>
+<ul>
+<li><strong>Calibrated LLM judges.</strong> Rubric judges or juries are checked against human labels. SECQUE-Judge reached F1 0.85 agreement with humans (<a href="https://arxiv.org/abs/2504.04596" target="_blank" rel="noopener">arXiv 2504.04596</a>).</li>
+<li><strong>Refusal as a separate outcome.</strong> FinanceBench grades answers as correct, incorrect or refused (<a href="https://arxiv.org/pdf/2311.11944" target="_blank" rel="noopener">arXiv 2311.11944</a>).</li>
+<li><strong>Faithfulness metrics.</strong> RAGAS-style faithfulness and context precision (<a href="https://arxiv.org/abs/2309.15217" target="_blank" rel="noopener">arXiv 2309.15217</a>).</li>
+<li><strong>Reliability, cost and latency.</strong> pass^k for reliability, and cost and latency reported next to accuracy (<a href="https://www.vals.ai/benchmarks/fabv2-1" target="_blank" rel="noopener">Vals AI</a>).</li>
+</ul>
+<p>MAST adds a failure taxonomy that can be applied to traces. It has 14 modes in three categories, human agreement of κ=0.88, and an LLM judge at 94% accuracy (<a href="https://arxiv.org/html/2503.13657v3" target="_blank" rel="noopener">arXiv 2503.13657</a>).</p>
+<div class="tbl"><table>
+<thead>
+<tr>
+<th>Benchmark or metric</th>
+<th>What it measures</th>
+<th>FinSight relevance</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>FinanceBench-150 (open subset)</td>
+<td>Filing QA: correct / incorrect / refused</td>
+<td>Cheap external sanity number; not FinSight's domain</td>
+</tr>
+<tr>
+<td>Vals Finance Agent (public 27)</td>
+<td>Analyst agent tasks with cost and latency</td>
+<td>External agent sanity check; FinSight will not lead it</td>
+</tr>
+<tr>
+<td>FinanceQA assumption subset</td>
+<td>Surfacing assumptions</td>
+<td>Tests FinSight's <code>missing_data</code> / <code>ambiguous</code> handling</td>
+</tr>
+<tr>
+<td>IndiaFinBench</td>
+<td>SEBI/RBI interpretation and numerics</td>
+<td>Knowledge-agent RAG over Indian regulation</td>
+</tr>
+<tr>
+<td>MoneyCounts/NFEC literacy</td>
+<td>Personal-finance knowledge</td>
+<td>Literacy agent; compare with the 68% mean</td>
+</tr>
+<tr>
+<td>FinMTEB</td>
+<td>Embedding retrieval quality</td>
+<td>Choosing a replacement for hashed embeddings</td>
+</tr>
+<tr>
+<td>AgentDojo banking, InjecAgent</td>
+<td>Attack success rate, utility under attack</td>
+<td>Injection via uploaded statements and KB text</td>
+</tr>
+<tr>
+<td>AgentLeak</td>
+<td>Inter-agent privacy leakage</td>
+<td>Required once specialists share memory</td>
+</tr>
+<tr>
+<td>pass^k, MAST labels, judge κ</td>
+<td>Reliability, failure modes, evaluation validity</td>
+<td>Core of the ablation study</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="a-routed-verified-architecture-grows-directly-from-finsights-existing-modules">A routed, verified architecture grows directly from FinSight's existing modules</h2>
+<h3 id="the-current-repo-is-already-a-routing-workflow">The current repo is already a "routing workflow"</h3>
+<p>Anthropic separates <em>workflows</em>, where code paths are predefined, from <em>agents</em>, where the LLM directs its own tool use. It advises starting with the simplest workflow that works and moving to orchestrator-workers only for parallel, context-heavy tasks (<a href="https://www.anthropic.com/research/building-effective-agents" target="_blank" rel="noopener">Anthropic, Building effective agents</a>). FinSight is already a routing workflow:</p>
+<ul>
+<li><code>detect_intent</code> in <code>backend/app/services/ai_context.py</code> classifies about 20 intents with regex.</li>
+<li><code>build_context</code> computes user-scoped figures from <code>finance.py</code> and <code>ledger.py</code>.</li>
+<li><code>backend/app/services/ai_service.py</code> either narrates those figures through an optional LLM or returns <code>deterministic_answer</code>.</li>
+<li>Around line 499, <code>ai_service.py</code> falls back to the deterministic answer if an exact-intent LLM reply contains no digit. This is a primitive verification gate.</li>
+</ul>
+<p>The research lab already contains the seed of a numeric-faithfulness metric. <code>extract_amounts</code>, <code>required_amounts</code> and <code>_all_context_amounts</code> in <code>backend/app/services/research.py</code> compute which rupee amounts in a response were never present in the evidence.</p>
+<p>The same lab also shows why its current scores cannot carry a paper:</p>
+<ul>
+<li><strong>Refusal intents get automatic grounding credit.</strong> <code>evaluate_response</code> assigns grounding 5.0 to every refusal-type intent.</li>
+<li><strong>The invented-figure penalty is gated.</strong> It applies only when the response contains "you" or "your".</li>
+<li><strong>Refusals are detected by substring.</strong> <code>REFUSAL_MARKERS</code> includes common words such as "never" and "cannot".</li>
+<li><strong>The baseline is a straw man.</strong> It answers with no context, so the grounded mode wins partly by construction.</li>
+</ul>
+<h3 id="every-agent-maps-to-existing-code">Every agent maps to existing code</h3>
+<p>Anthropic's own data argues against putting agents everywhere. Personal-finance questions mostly read the same ledger, which is the "shared context, many dependencies" case Anthropic calls a poor fit for multi-agent (<a href="https://www.anthropic.com/engineering/multi-agent-research-system" target="_blank" rel="noopener">Anthropic Engineering</a>). Multi-agent systems in that study also used about <strong>15× the tokens</strong> of chat (<a href="https://www.anthropic.com/engineering/multi-agent-research-system" target="_blank" rel="noopener">Anthropic Engineering</a>). The design below therefore keeps one persona, one engine and one verifier. "Agents" are specialist prompt-and-tool bundles behind a router. Orchestrator-workers are allowed only for compound questions such as "Can I afford X given my goals, bills and tax?".</p>
+<div class="tbl"><table>
+<thead>
+<tr>
+<th>Agent / layer</th>
+<th>Grows out of</th>
+<th>What to build</th>
+<th>Metric it should move</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Router / supervisor</strong></td>
+<td><code>ai_context.detect_intent</code> (regex, about 20 intents)</td>
+<td>Hybrid: keep regex as the trusted first pass, add an LLM classifier only for <code>general</code>/<code>ambiguous</code>; emit a plan of tool calls; detect compound questions</td>
+<td>Intent accuracy and macro-F1 on a labelled set; MAST FC1 rate (spec disobedience, step repetition)</td>
+</tr>
+<tr>
+<td><strong>Typed tool layer</strong></td>
+<td><code>finance.py</code> (budgets, goals, forecasts with backtest, recurring, anomalies, scenarios), <code>ledger.py</code></td>
+<td>Expose engine functions as typed, read-only tools with poka-yoke parameters (month bounds, category IDs) and Decimal outputs carrying provenance IDs</td>
+<td>Exact-answer accuracy against independent gold; tool-call error rate</td>
+</tr>
+<tr>
+<td><strong>Spending &amp; cash-flow analyst</strong></td>
+<td><code>total_spending</code>, <code>comparison</code>, <code>merchant</code>, <code>cash_flow</code> intents</td>
+<td>Specialist prompt plus tools; no free text-to-SQL. BookSQL shows ledger text-to-SQL is far from solved (<a href="https://arxiv.org/abs/2406.07860" target="_blank" rel="noopener">arXiv 2406.07860</a>)</td>
+<td>Numeric Faithfulness Rate (NFR); pass^k</td>
+</tr>
+<tr>
+<td><strong>Budget &amp; bills agent</strong></td>
+<td>Budget burn-rate in <code>finance.py</code>; <code>Bill</code> model; <code>notifications.py</code> rules</td>
+<td>Bill calendar tools; BBPS bill-fetch via a partner later (<a href="https://docs.setu.co/payments/billpay/v1/api-integration/apis" target="_blank" rel="noopener">Setu BillPay</a>)</td>
+<td>Budget-status accuracy; alert precision and dismiss rate</td>
+</tr>
+<tr>
+<td><strong>Goals &amp; scenario planner</strong></td>
+<td>Goal projections, observed-month scenario baselines, <code>routes/scenarios.py</code></td>
+<td>Multi-step "what-if" with assumptions stated explicitly</td>
+<td>Assumption-surfacing rate (FinanceQA-style); run-to-run variance (target zero for numbers)</td>
+</tr>
+<tr>
+<td><strong>Anomaly / fraud sentinel</strong></td>
+<td>Anomalies in <code>finance.py</code>; <code>AnomalyFeedback</code> model</td>
+<td>Use feedback as labels; explain each flag with evidence</td>
+<td>Precision and recall against <code>AnomalyFeedback</code> labels</td>
+</tr>
+<tr>
+<td><strong>Ingestion &amp; categorization agent</strong></td>
+<td><code>csv_import.py</code>, <code>csv_safety.py</code>, <code>RecurringOverride</code></td>
+<td>CAS PDF parser, bank-statement parsers, UPI VPA-to-merchant normalization, per-user correction learning</td>
+<td>Top-1 categorization accuracy (context: Intuit's 68.67% few-shot reference, different data); import error rate</td>
+</tr>
+<tr>
+<td><strong>Knowledge &amp; literacy agent</strong></td>
+<td><code>knowledge.py</code> (256-dim hashed bag-of-words)</td>
+<td>Replace hashing with an embedding model chosen using FinMTEB; add Indian tax and regulatory corpus</td>
+<td>Recall@K and nDCG on a labelled KB set; IndiaFinBench and literacy-test accuracy</td>
+</tr>
+<tr>
+<td><strong>Verifier / citation agent</strong></td>
+<td><code>research.extract_amounts</code>, <code>_all_context_amounts</code>; digit check in <code>ai_service.py</code></td>
+<td>Deterministic post-hoc checker: every number in the answer must match a tool output or cited passage within tolerance; on mismatch, regenerate once, then abstain or fall back</td>
+<td>NFR, unsupported-number rate, abstention precision</td>
+</tr>
+<tr>
+<td><strong>Policy &amp; safety guard</strong></td>
+<td><code>injection</code>, <code>privacy</code>, <code>unsupported_advice</code>, <code>action_request</code> intents; <code>FORBIDDEN_PATTERNS</code></td>
+<td>CaMeL-style split between control flow and data flow: retrieved or uploaded text never chooses tools or parameters</td>
+<td>AgentDojo-style attack success rate and utility under attack</td>
+</tr>
+<tr>
+<td><strong>Action agent (later)</strong></td>
+<td><code>action_request</code> (currently refused)</td>
+<td>Confirm-then-act for reversible operations (create budget, mark bill paid) with step-up authentication</td>
+<td>Action success pass^k; unintended-action rate</td>
+</tr>
+<tr>
+<td><strong>Evaluator / lab</strong></td>
+<td><code>research.py</code>, <code>docs/RESEARCH.md</code>, <code>ResearchCase/Run/Response</code></td>
+<td>Larger case set, judge jury, pass^k, cost and latency logging, MAST labels, bootstrap CIs</td>
+<td>Judge–human κ; confidence-interval width</td>
+</tr>
+</tbody>
+</table></div>
+<p>The verifier is the single most important addition. MAST found that <strong>missing or incorrect verification accounts for about 17% of failures</strong>, and that adding high-level objective verification gave the largest measured improvement, <strong>+15.6%</strong> on ChatDev (<a href="https://arxiv.org/html/2503.13657v3" target="_blank" rel="noopener">arXiv 2503.13657</a>). Anthropic's research system adds a dedicated CitationAgent after synthesis for the same reason (<a href="https://www.anthropic.com/engineering/multi-agent-research-system" target="_blank" rel="noopener">Anthropic Engineering</a>).</p>
+<h3 id="user-management-becomes-households-roles-and-delegated-tokens">User management becomes households, roles and delegated tokens</h3>
+<p>Today each user is an isolated tenant:</p>
+<ul>
+<li>JWT in an HttpOnly cookie, with <code>token_version</code> revocation.</li>
+<li>PBKDF2 password hashing.</li>
+<li>Foreign IDs return 404 through <code>backend/app/api/deps.py</code>.</li>
+<li>No households, roles or delegation on the <code>User</code> model in <code>backend/app/models.py</code>.</li>
+</ul>
+<p>The proposed model makes a household the tenant. Members hold one of four roles: owner, partner, dependent (read-only or allowance) and external advisor (time-boxed, scoped read). Attribute conditions (account ownership, consent purpose, expiry) control access to individual rows, and every grant is recorded in a consent ledger.</p>
+<p>Each specialist agent gets a <strong>down-scoped, short-lived token</strong> derived from the acting user's grant, never the session cookie. This follows the MCP authorization rules: servers must validate that a token was issued for them and must not pass tokens through to upstream APIs (<a href="https://modelcontextprotocol.io/specification/2025-06-18/basic/authorization" target="_blank" rel="noopener">MCP spec</a>). Payments, sharing changes and advisor grants require step-up re-authentication.</p>
+<p>Every tool call is logged with user, agent, scope and hashes of its inputs and outputs. Those logs map onto RBI FREE-AI and SEBI's proposed auditability and record-keeping principles (<a href="https://www.rbi.org.in/scripts/BS_PressReleaseDisplay.aspx?prid=61018" target="_blank" rel="noopener">RBI</a>; <a href="https://www.taxmann.com/post/blog/sebi-proposes-ai-ml-governance-framework-for-securities-markets" target="_blank" rel="noopener">Taxmann</a>) and onto the OWASP Agentic Top 10's identity, privilege-abuse and inter-agent-communication risks (<a href="https://genai.owasp.org/resource/owasp-top-10-for-agentic-applications-for-2026" target="_blank" rel="noopener">OWASP</a>). Financial profile facts (income band, risk appetite, obligations) should be stored as typed, user-editable records tagged with their source, not as free-text memory, to limit memory poisoning (OWASP ASI06).</p>
+<h3 id="integrations-follow-the-licence-boundary">Integrations follow the licence boundary</h3>
+<p>An unregulated app cannot be an AA FIU. The realistic order is:</p>
+<ol>
+<li><strong>Statement, CSV and CAS PDF parsing.</strong> CAS PDFs cover mutual fund and demat holdings without a licence and fit the existing import pipeline (<a href="https://casparser.in/blog/state-of-account-aggregator-2026/" target="_blank" rel="noopener">CASParser</a>, vendor source).</li>
+<li><strong>An AA prototype in a technology-service-provider sandbox</strong> against mock FIPs (<a href="https://docs.setu.co/data/account-aggregator/licenses-and-go-live/go-live" target="_blank" rel="noopener">Setu go-live</a>).</li>
+<li><strong>Production AA access through a regulated partner FIU.</strong></li>
+</ol>
+<p>Outward-facing MCP servers, for example exposing FinSight data to Claude or ChatGPT as Monarch now does, are cheap to add once the typed tool layer exists. A2A and AP2 matter only once FinSight acts with external agents (<a href="https://linuxfoundation.org/press/a2a-protocol-surpasses-150-organizations-lands-in-major-cloud-platforms-and-sees-enterprise-production-use-in-first-year" target="_blank" rel="noopener">Linux Foundation</a>).</p>
+<h3 id="build-evaluation-first-then-agents">Build evaluation first, then agents</h3>
+<div class="tbl"><table>
+<thead>
+<tr>
+<th>Phase</th>
+<th>Build</th>
+<th>Ablation arm it enables</th>
+<th>Metrics that must move</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>0. Evaluation infrastructure</strong></td>
+<td>Synthetic India household ledger generator; 300+ cases with independently computed gold; LLM-judge jury calibrated on about 50 human-labelled cases; pass^k (k=4); cost and latency logging; bootstrap CIs; MAST labelling; fix rubric biases in <code>research.py</code></td>
+<td>Re-scores existing A0 (no context), A1 (deterministic only), A2 (current grounded prompt)</td>
+<td>Judge–human κ ≥ 0.7; CI width</td>
+</tr>
+<tr>
+<td><strong>1. Tools + verifier (single agent)</strong></td>
+<td>Typed tool layer over <code>finance.py</code>/<code>ledger.py</code>; numeric-faithfulness verifier with abstention</td>
+<td>A3 single agent + tools; A4 = A3 + verifier</td>
+<td>NFR, exact accuracy, abstention precision, pass^k</td>
+</tr>
+<tr>
+<td><strong>2. Specialists behind the router</strong></td>
+<td>Hybrid router; specialist prompts and tool subsets; orchestrator-workers for compound questions only</td>
+<td>A5 router + specialists + verifier; A6 orchestrator-workers + verifier; A7 = A6 without verifier</td>
+<td>Accuracy on compound questions vs tokens and latency; MAST distribution</td>
+</tr>
+<tr>
+<td><strong>3. Households and consent</strong></td>
+<td>Household tenant, roles, consent ledger, scoped agent tokens, audit log</td>
+<td>Same arms on adversarial household cases</td>
+<td>Cross-member leak rate; AgentLeak-style inter-agent leakage; audit completeness</td>
+</tr>
+<tr>
+<td><strong>4. Integrations and categorization</strong></td>
+<td>CAS and statement parsers; VPA normalization; AA sandbox</td>
+<td>Ingestion experiments</td>
+<td>Categorization top-1; import error rate</td>
+</tr>
+<tr>
+<td><strong>5. Retrieval, safety, actions, nudges</strong></td>
+<td>Embedding retriever; CaMeL-style guard; confirm-then-act; nudge outcome tracking</td>
+<td>Safety and outcome studies</td>
+<td>Recall@K/nDCG; attack success rate; dismiss rate; goal-attainment change</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="where-finsight-can-plausibly-win-and-where-it-will-not">Where FinSight can plausibly win, and where it will not</h3>
+<p>FinSight will not top FinanceBench or the Vals Finance Agent leaderboard. Those benchmarks test SEC-filing analysis with web and EDGAR tools, and FinSight's engine is not built for that. Reporting them is useful only as a sanity check on the narration model.</p>
+<p>FinSight's credible wins are on its own task family, measured against strong baselines:</p>
+<ul>
+<li><strong>Exact numbers.</strong> On per-user exact-number questions, routing to the Decimal engine should beat an LLM given raw transactions by a wide margin. The relevant comparison points are FinanceBench's 81% wrong-or-refused rate and FinanceQA's sub-50% exact match for LLMs working alone.</li>
+<li><strong>Consistency.</strong> Deterministic numbers should drive pass^k for figures toward 1.0. GPT-5.2's advice varied by about $3,220 across identical queries (<a href="https://arxiv.org/html/2608.01607v1" target="_blank" rel="noopener">arXiv 2608.01607</a>).</li>
+<li><strong>Assumptions.</strong> Explicit <code>missing_data</code> and <code>ambiguous</code> handling should beat the 2.2–4.3% assumption-surfacing rate measured on FinanceQA (<a href="https://arxiv.org/pdf/2501.18062" target="_blank" rel="noopener">arXiv 2501.18062</a>).</li>
+<li><strong>Prompt injection.</strong> Because the regex router is a trusted control-flow extractor, FinSight can target low attack success with little loss of utility. CaMeL reported <strong>77% of AgentDojo tasks solved with provable security, against 84% undefended</strong> (<a href="https://arxiv.org/abs/2503.18813" target="_blank" rel="noopener">arXiv 2503.18813</a>).</li>
+<li><strong>Cost.</strong> A grounded 7–8B narrator could hold accuracy at a fraction of frontier cost. A fine-tuned 8B personal-finance model came close to 27–32B models at <strong>$0.96 versus $5.63 per 504 queries</strong> (<a href="https://arxiv.org/pdf/2509.14180" target="_blank" rel="noopener">arXiv 2509.14180</a>).</li>
+</ul>
+<h2 id="the-papers-contribution-is-the-verified-ledger-benchmark-plus-an-honest-multi-agent-ablation">The paper's contribution is the verified-ledger benchmark plus an honest multi-agent ablation</h2>
+<h3 id="five-gaps-the-notes-support">Five gaps the notes support</h3>
+<ol>
+<li><strong>No private-ledger benchmark.</strong> The researchers found no agent benchmark that evaluates personal-finance assistants over a private, per-user ledger with verifiable gold numbers. Finance-agent benchmarks are institutional or investing-focused (<a href="https://aclanthology.org/2025.acl-long.126" target="_blank" rel="noopener">InvestorBench</a>; <a href="https://alphaxiv.org/abs/2508.00828" target="_blank" rel="noopener">Finance Agent Benchmark</a>), and no peer-reviewed study evaluates an LLM over a user's actual transaction ledger. This rests on a limited search, so the paper should say "to our knowledge".</li>
+<li><strong>MAST has never been applied to finance.</strong> It was built on coding, math and general frameworks (<a href="https://arxiv.org/html/2503.13657v3" target="_blank" rel="noopener">arXiv 2503.13657</a>). The 2026 call for "coordination primacy" and cost-aware evaluation of financial multi-agent systems (<a href="https://arxiv.org/html/2603.27539v1" target="_blank" rel="noopener">arXiv 2603.27539</a>) and the Alpha Illusion's "multi-agent disaggregation" protocol (<a href="https://arxiv.org/abs/2605.16895" target="_blank" rel="noopener">arXiv 2605.16895</a>) have not been carried over to personal finance.</li>
+<li><strong>No consent- or household-aware evaluation exists.</strong> CaMeL's results come from general AgentDojo tasks, not shared household ledgers (<a href="https://arxiv.org/abs/2503.18813" target="_blank" rel="noopener">arXiv 2503.18813</a>). AgentLeak warns that inter-agent channels leak (<a href="https://arxiv.org/html/2602.11510v1" target="_blank" rel="noopener">arXiv 2602.11510</a>).</li>
+<li><strong>No Indian retail benchmark exists.</strong> INR budgeting, tax-regime comparison, UPI narrations, SIPs and Hinglish are all uncovered. IndiaFinBench covers regulation only (<a href="https://arxiv.org/abs/2604.19298" target="_blank" rel="noopener">arXiv 2604.19298</a>).</li>
+<li><strong>No numeric-faithfulness metric for conversational finance has been standardized.</strong> VeNRA verifies against corporate documents (<a href="https://arxiv.org/html/2603.04663v1" target="_blank" rel="noopener">arXiv 2603.04663</a>), and PHANTOM detects hallucinations but does not trace numbers to tool outputs (<a href="https://neurips.cc/virtual/2025/poster/121830" target="_blank" rel="noopener">NeurIPS 2025</a>).</li>
+</ol>
+<p>Longitudinal outcomes of proactive nudges are a sixth gap, but they need a user study with ethics approval. They belong in a follow-up paper.</p>
+<h3 id="proposed-paper-outline">Proposed paper outline</h3>
+<div class="tbl"><table>
+<thead>
+<tr>
+<th>Element</th>
+<th>Proposal</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Title ideas</strong></td>
+<td>"Do Personal Finance Assistants Need Many Agents? A Verified-Ledger Benchmark and Ablation"; "LedgerBench-IN: Evaluating Grounded Multi-Agent Assistants on Private Household Finances"; "Numbers You Can Trace: Numeric Faithfulness for Conversational Personal Finance Agents"</td>
+</tr>
+<tr>
+<td><strong>RQ1</strong></td>
+<td>On per-user ledger questions, how much do typed deterministic tools and a numeric-faithfulness verifier improve accuracy, faithfulness and pass^k over LLM-only and raw-context baselines?</td>
+</tr>
+<tr>
+<td><strong>RQ2</strong></td>
+<td>Holding tools and verifier fixed, does routing to specialists, or orchestrator-workers, improve accuracy on single-intent and compound questions, and at what token, latency and failure-mode cost (MAST)?</td>
+</tr>
+<tr>
+<td><strong>RQ3</strong></td>
+<td>Do role-scoped agent tokens and separating control flow from data flow reduce cross-member leakage and injection success without losing utility?</td>
+</tr>
+<tr>
+<td><strong>RQ4</strong></td>
+<td>How well do LLM judges agree with humans on personal-finance answers, and how does the lexical rubric-v1 diverge from them?</td>
+</tr>
+<tr>
+<td><strong>Contributions</strong></td>
+<td>(C1) An open India-context synthetic household-ledger benchmark with independently computed gold, difficulty tiers (lookup / multi-step / compound / abstain), and adversarial household and injection splits. (C2) The NFR metric and a deterministic verifier. (C3) A disaggregated ablation of single-agent, routed and orchestrated designs with MAST-labelled failures and cost reporting. (C4) A household consent model with scoped agent tokens, evaluated for leakage. (C5) An open-source reference system (FinSight_AI) with run provenance already built in.</td>
+</tr>
+<tr>
+<td><strong>Method</strong></td>
+<td>Generate seeded synthetic households (salary, rent, EMIs, UPI P2M/P2P narrations, SIPs, bills, irregular income). Compute gold with a second, independent implementation (pandas/SQL reference plus hand-checked samples), not <code>finance.py</code>, to avoid circular grading. Run arms A0–A7 across at least two model families (one frontier, one open 7–8B) at k=4. Grade with a calibrated three-model jury plus deterministic numeric checks.</td>
+</tr>
+<tr>
+<td><strong>Experiments</strong></td>
+<td>E1 main ablation; E2 compound-question scaling (2, 3 and 4 sub-questions); E3 household leakage and injection (AgentDojo-style, attacks embedded in uploaded statements and KB text); E4 judge validity (about 100 human-labelled items; κ); E5 external sanity checks (FinanceBench-150, IndiaFinBench, literacy set, public Vals 27); E6 categorization on synthetic and opt-in real data.</td>
+</tr>
+<tr>
+<td><strong>Metrics</strong></td>
+<td>Exact-match accuracy; NFR and unsupported-number rate; abstention precision and recall (correct / incorrect / refused); pass^k; jury rubric score with dealbreakers; Recall@K / nDCG; attack success rate and utility under attack; leak rate; tokens, cost and p50/p95 latency per correct answer; MAST mode distribution; judge–human κ.</td>
+</tr>
+<tr>
+<td><strong>Threats to validity</strong></td>
+<td>Synthetic data may not match real ledgers (mitigate with opt-in anonymized real samples and a realism audit). Circular gold if the engine grades itself. Judge bias and self-preference when judge and system share a model family. Small n (report bootstrap CIs and pre-register hypotheses). Model and version drift (pin versions; <code>research.py</code> already stores provider, model, prompt and rubric versions). India-specific results may not transfer. Regex router overfitting to the benchmark's phrasing (hold out paraphrased and Hinglish queries). Regulatory scope: personalized investment advice may require SEBI registration, so the system must stay in descriptive and educational territory.</td>
+</tr>
+<tr>
+<td><strong>Target venues</strong></td>
+<td>ACM ICAIF (finance AI; <a href="https://dl.acm.org/doi/10.1145/3768292.3770387" target="_blank" rel="noopener">ICAIF 2025 example</a>); the ACL FinNLP workshop (<a href="https://aclanthology.org/2025.finnlp-2.15.pdf" target="_blank" rel="noopener">FinNLP 2025</a>); NeurIPS Datasets &amp; Benchmarks for the benchmark itself, which is where FinBen and PHANTOM appeared (<a href="https://neurips.cc/virtual/2025/poster/121830" target="_blank" rel="noopener">PHANTOM</a>); EMNLP or ACL Findings for the ablation (<a href="https://aclanthology.org/2025.findings-emnlp.972/" target="_blank" rel="noopener">EMNLP 2025 Findings survey</a>). A later user study on nudges and trust fits an HCI venue.</td>
+</tr>
+</tbody>
+</table></div>
+<p>The honest framing should be stated in the abstract. The likely result is that tools and the verifier deliver most of the gain, routing adds modest specialization benefits, and orchestrator-workers help only on compound questions at several times the cost. Several observations point that way: MAST's "often minimal" gains, the roughly 20% debate win rate (<a href="https://arxiv.org/abs/2605.16895" target="_blank" rel="noopener">arXiv 2605.16895</a>), and Anthropic's finding that <strong>token usage alone explained 80% of performance variance</strong> on BrowseComp (<a href="https://www.anthropic.com/engineering/multi-agent-research-system" target="_blank" rel="noopener">Anthropic Engineering</a>). A paper that reports this cleanly, with a disaggregated ablation, is more publishable than one claiming multi-agent superiority, and much harder to dismiss.</p>
+<h2 id="conclusion">Conclusion</h2>
+<p>FinSight_AI's main asset is a deterministic Decimal engine with evidence-carrying answers and a provenance-logging lab, not the number of bots it could add. That same split between a deterministic engine and an LLM front end appears in the best-run bank assistant and in the strongest critique of finance agents. The work that turns this into a paper is mostly evaluation work:</p>
+<ul>
+<li>an independent-gold household benchmark;</li>
+<li>a numeric-faithfulness verifier promoted from the helper functions already in <code>research.py</code>;</li>
+<li>calibrated judges with pass^k;</li>
+<li>an ablation that credits each component, including the router and specialists, only with the gain it actually produces.</li>
+</ul>
+<p>User management and integrations matter to the paper because they create new, measurable risks: leakage across household members and agents, and injection through imported statements. The AA licence boundary means the first integrations should be statements and CAS PDFs, with AA used in sandbox only. The most useful single result would be a cost-accuracy frontier showing that a small, verified, routed system matches frontier LLMs on private-ledger questions at a fraction of the cost. That would be useful to anyone building consumer finance assistants, whether or not multi-agent turns out to help.</p>
+    </article>
+  </div>
+</div>
