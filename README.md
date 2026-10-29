@@ -96,6 +96,7 @@ Free API tiers change their model names and limits often. If the API stops with 
 | `LLM_NAME` | `Qwen/Qwen2.5-7B-Instruct` in 4-bit | Any instruction-tuned model on Hugging Face |
 | `API_MODEL` | `gemini-2.5-flash-lite` | Any model your OpenAI-compatible provider offers |
 | `AGENT_MAX_STEPS` | 3 | 5, to give the single agent more tool calls |
+| `TOKEN_BUDGET` | 12000 | 8000 if the GPU still runs out of memory (batches also split themselves automatically when that happens) |
 
 ## Outputs
 
