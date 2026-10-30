@@ -35,7 +35,7 @@ part2_agents_and_memory.ipynb
 
 ### Two backends, identical prompts
 
-Every LLM arm runs on a **local open model** (Qwen 2.5 7B Instruct in 4-bit, with a 3B fallback) and, when an API key is present, an **API model** (default Gemini 2.5 Flash-Lite through Google's OpenAI-compatible endpoint; Groq or any other OpenAI-compatible provider works). Both use the same system prompt, the same messages and greedy decoding. The API runs on the first part of the same random sample, and the notebook also scores the local model on exactly those questions, so the two backends pair up. Every generation is cached on disk with its prompt and output token counts, so a run stopped by a rate limit continues where it stopped.
+Every LLM arm runs on a **local open model** (Qwen 2.5 7B Instruct in 4-bit, with a 3B fallback) and, when an API key is present, an **API model** (default Gemini 3.5 Flash-Lite on Google's free tier, through its OpenAI-compatible endpoint; Groq or any other OpenAI-compatible provider works). Both use the same system prompt, the same messages and greedy decoding. The API runs on the first part of the same random sample, and the notebook also scores the local model on exactly those questions, so the two backends pair up. Every generation is cached on disk with its prompt and output token counts, so a run stopped by a rate limit continues where it stopped.
 
 ### E4 · Agents
 
@@ -85,7 +85,7 @@ These use different splits and setups, so treat them as context. The fair compar
 6. For the real results, set `FAST = False` and use **Save Version → Save & Run All (Commit)**. The local model takes roughly 2–3 hours on one T4 (about 3,000 generations); the API adds about 1.5 hours at 10 requests per minute (about 900 calls).
 7. Download the results from the saved version's **Output** tab with **Download Output**.
 
-Free API tiers change their model names and limits often. If the API stops with a rate-limit or quota message, run the notebook again later: finished answers are cached and it continues from there. To use Groq, set `API_BASE_URL = "https://api.groq.com/openai/v1/"` and pick a current Groq model name for `API_MODEL`.
+Free API tiers change their model names and limits often. If the API stops with a rate-limit or quota message, run the notebook again later: finished answers are cached and it continues from there. To use Groq instead, set `API_BASE_URL = "https://api.groq.com/openai/v1/"`, `API_MODEL = "openai/gpt-oss-20b"` and `API_RPM = 5` (its free tier allows only 8,000 tokens per minute). At the start of the run the notebook prints every model your key can use, and warns you if `API_MODEL` is not one of them.
 
 ### Settings worth trying
 
@@ -94,7 +94,7 @@ Free API tiers change their model names and limits often. If the API stops with 
 | `TATQA_N` / `CONV_N` | 300 questions / 100 conversations | 1668 / 421 for the full dev sets |
 | `API_TATQA_N` / `API_CONV_N` | 100 / 30 | Larger if your API limits allow |
 | `LLM_NAME` | `Qwen/Qwen2.5-7B-Instruct` in 4-bit | Any instruction-tuned model on Hugging Face |
-| `API_MODEL` | `gemini-2.5-flash-lite` | Any model your OpenAI-compatible provider offers |
+| `API_MODEL` | `gemini-3.5-flash-lite` (free) | `gemini-3.8-flash` (free, stronger but slower); on Groq, `openai/gpt-oss-20b` (free) |
 | `AGENT_MAX_STEPS` | 3 | 5, to give the single agent more tool calls |
 | `TOKEN_BUDGET` | 12000 | 8000 if the GPU still runs out of memory (batches also split themselves automatically when that happens) |
 
