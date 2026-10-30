@@ -59,7 +59,7 @@ Every LLM arm runs on a **local open model** (Qwen 2.5 7B Instruct in 4-bit, wit
 | --- | --- |
 | **No memory** | Only the current question |
 | **Transcript** | Every earlier question with the assistant's own earlier answers, as chat apps do |
-| **Structured memory** | A short ledger of earlier results as named variables (`m1 = 60.94  # price per share in 2007`) that the program can use directly. The model writes each label itself, like a `memory.md` file |
+| **Structured memory** | A short ledger of earlier results as named variables (`m1 = 60.94  # price per share in 2007`) that the program can use directly, each labelled with the question it answered, like a `memory.md` file. Turn 1 is identical in every arm |
 
 - Every arm answers with Part 1's reason-then-program method and sees ConvFinQA's annotated supporting facts, as Part 1 did with FinQA.
 - The assistant's own earlier answers are carried forward, never the gold ones, so mistakes propagate as they would for a real user.
