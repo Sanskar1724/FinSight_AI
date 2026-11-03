@@ -12,6 +12,8 @@ Every experiment runs on real public data, with no curated or synthetic examples
 | File | What it is |
 | --- | --- |
 | [`part2_agents_and_memory.ipynb`](part2_agents_and_memory.ipynb) | The full experiment notebook, ready to import into Kaggle |
+| [`part2_local_gpu.ipynb`](part2_local_gpu.ipynb) | The same notebook with only the local model (GPU session) |
+| [`part2_api_cpu.ipynb`](part2_api_cpu.ipynb) | The same notebook with only the API model (no GPU), to run at the same time as the local one |
 
 ## Experiments
 
