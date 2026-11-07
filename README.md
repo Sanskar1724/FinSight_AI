@@ -16,7 +16,7 @@ and an AI assistant that answers from your own records, with the evidence attach
 ![Python 3.12](https://img.shields.io/badge/Python-3.12-3776ab?logo=python&logoColor=white)
 ![PWA](https://img.shields.io/badge/PWA-installable-5a0fc8)
 
-[Features](#features) · [Run it locally](#run-it-locally) · [How it works](#how-it-works) · [Security](#security--privacy) · [Docs](#documentation)
+[Features](#features) · [Run it locally](#run-it-locally) · [How it works](#how-it-works) · [Security](#security--privacy) · [Docs](#documentation) · [Research](#research)
 
 <br />
 
@@ -290,16 +290,22 @@ docs/               Architecture, API, research, deployment, screenshots
 | [Deployment](docs/DEPLOYMENT.md) | PostgreSQL, HTTPS, CORS, and hosting options |
 | [Upgrade log](UPGRADE_PROGRESS.md) | What changed, how it was verified, and what is still open |
 
-## Roadmap
+## Research
 
-- [x] Grounded assistant with evidence and safe refusals
-- [x] Notification lifecycle with quiet hours and deep links
-- [x] Command palette and history-based categorisation
-- [x] CI for tests, migrations, lint, typecheck, and build
-- [ ] PostgreSQL job and browser end-to-end tests in CI
-- [ ] Durable research runs across restarts and workers
-- [ ] Zod 4 upgrade ([GHSA-mrhx-c7xc-m3w5](https://github.com/advisories/GHSA-mrhx-c7xc-m3w5))
-- [ ] Dark mode
+FinSight is also a research project. The goal is a paper on assistants that answer from a person's own finances with numbers that can be checked. Every experiment runs on real public benchmarks as a Kaggle notebook on its own branch.
+
+| Part | Question | Benchmark | Result so far |
+| --- | --- | --- | --- |
+| [Part 1](https://github.com/Sanskar1724/FinSight_AI/tree/research/part-1-grounding-benchmarks) · Routing | Can embeddings replace rule-based intent routing? | Banking77 | bge-m3 **93.4%** vs 65.5% for the current router (83.8% vs 45.1% with 5 examples per intent) |
+| [Part 1](https://github.com/Sanskar1724/FinSight_AI/tree/research/part-1-grounding-benchmarks) · Search | Which retriever finds the right finance passage? | FiQA (BEIR) | bge-m3 nDCG@10 **0.410** vs 0.236 for BM25 and 0.127 for the current hashed vectors |
+| [Part 1](https://github.com/Sanskar1724/FinSight_AI/tree/research/part-1-grounding-benchmarks) · Numbers | Does computing with code beat answering directly? | FinQA | Reason-then-program **71.0%** vs 48.7% direct; when two methods agree the answer is right 82.6% of the time |
+| [Part 2](https://github.com/Sanskar1724/FinSight_AI/tree/research/part-2-agents-and-memory) · Agents | Do a router and specialist agents beat one agent? | TAT-QA | In progress |
+| [Part 2](https://github.com/Sanskar1724/FinSight_AI/tree/research/part-2-agents-and-memory) · Memory | Which memory design handles follow-up questions best? | ConvFinQA | Remembering the conversation **64.4%** vs 53.7% with no memory; structured memory in progress |
+
+Background reading:
+
+- [Literature review](https://github.com/Sanskar1724/FinSight_AI/tree/research/literature-review): about 35 related papers, common patterns, and nine research gaps with how FinSight's results address them.
+- [Research report](https://github.com/Sanskar1724/FinSight_AI/tree/research/multi-agent-finance-assistants): industry assistants, finance benchmarks, and the proposed architecture.
 
 <div align="center">
 <br />
