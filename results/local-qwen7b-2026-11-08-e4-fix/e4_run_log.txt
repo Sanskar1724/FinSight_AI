@@ -1,0 +1,35 @@
+E4 re-run with the formatting fix, 8 Nov 2026, Kaggle Tesla T4, Qwen/Qwen2.5-7B-Instruct (4-bit), same 300 TAT-QA dev questions (SEED 13).
+Notebook output as printed in the Kaggle session. The per-item files from this run were not downloaded.
+
+=== E4 on local (Qwen/Qwen2.5-7B-Instruct (4-bit)), 300 questions ===
+[local] E4 S1 direct: 0 cached, generating 300
+  300/300 (620s)
+[local] E4 S1 direct: finish 253 unanswered: 0 cached, generating 253
+  253/253 (561s)
+[local] E4 S2 agent step 1: 0 cached, generating 300
+  300/300 (805s)
+[local] E4 S2 agent step 2: 0 cached, generating 136
+  136/136 (212s)
+[local] E4 M2 orchestrator: 300 cached, generating 0
+[local] E4 lookup specialist: 0 cached, generating 222
+  222/222 (515s)
+[local] E4 lookup specialist: finish 39 unanswered: 0 cached, generating 39
+  39/39 (127s)
+[local] E4 calculator specialist: 300 cached, generating 0
+[local] E4 counter specialist: 8 cached, generating 0
+S1 · Single LLM                        EM 0.243 [0.193, 0.290]  F1 0.331  cover 0.91  sel 0.268  vs S2 -0.220 [-0.287, -0.167]  calls 1.84  tokens 1503
+S2 · Single agent + calculator         EM 0.463 [0.410, 0.520]  F1 0.531  cover 0.97  sel 0.478  vs S2 +0.000 [+0.000, +0.000]  calls 1.45  tokens 1219
+M1 · Learned router + specialists      EM 0.433 [0.377, 0.490]  F1 0.525  cover 0.97  sel 0.445  vs S2 -0.030 [-0.097, +0.033]  calls 1.12  tokens 947
+M2 · LLM orchestrator + specialists    EM 0.427 [0.367, 0.483]  F1 0.534  cover 0.97  sel 0.438  vs S2 -0.037 [-0.103, +0.027]  calls 2.10  tokens 1069
+Oracle · Gold route + specialists      EM 0.443 [0.387, 0.500]  F1 0.544  cover 0.98  sel 0.454  vs S2 -0.020 [-0.087, +0.043]  calls 1.11  tokens 935
+M3 · Router + specialists + checks     EM 0.360 [0.307, 0.420]  F1 0.437  cover 0.75  sel 0.478  vs S2 -0.103 [-0.167, -0.043]  calls 2.57  tokens 2165
+LLM orchestrator specialist accuracy: 0.927 (learned router: 0.940)
+
+Failure modes (share of questions):
+arm                                  abstained correct no-answer partial-span pct-vs-frac program-failed right-number-wrong-scale several-items-for-one sign-error text-instead-of-number wrong-number wrong-route wrong-span
+M1 · Learned router + specialists         0.00   0.433     0.000        0.087       0.013          0.020                    0.160                 0.050      0.023                  0.000        0.103       0.057      0.053
+M2 · LLM orchestrator + specialists       0.00   0.427     0.000        0.087       0.010          0.023                    0.150                 0.057      0.023                  0.007        0.110       0.060      0.047
+M3 · Router + specialists + checks        0.22   0.360     0.000        0.077       0.003          0.020                    0.123                 0.040      0.010                  0.000        0.067       0.030       0.050
+Oracle · Gold route + specialists         0.00   0.443     0.000        0.087       0.013          0.023                    0.180                 0.050      0.023                  0.003        0.123       0.000       0.053
+S1 · Single LLM                           0.00   0.243     0.093        0.067       0.007          0.000                    0.093                 0.250      0.003                  0.003        0.183       0.000       0.057
+S2 · Single agent + calculator            0.00   0.463     0.030        0.063       0.010          0.000                    0.133                 0.047      0.020                  0.000        0.173       0.000       0.060
