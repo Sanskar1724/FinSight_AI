@@ -122,6 +122,59 @@ Free API tiers change their model names and limits often. If the API stops with 
 | E4 | M3's right-when-answering is clearly above S2's exact match at a coverage FinSight can live with (for example 70% or more) |
 | E5 | Structured memory beats the transcript on follow-up turns with the paired CI above zero, and does not use more prompt tokens |
 
+## Results (local run, 8 Nov 2026, Kaggle Tesla T4, Qwen 2.5 7B Instruct 4-bit)
+
+The raw outputs of this run are in [`results/local-qwen7b-2026-11-08/`](results/local-qwen7b-2026-11-08/): every table, every scored item, the chart and the generation cache (so the run can be re-scored without a GPU). The API-model run is still pending.
+
+![Part 2 summary chart](results/local-qwen7b-2026-11-08/summary.png)
+
+**E4 · Agents (TAT-QA dev, 300 random questions, official scorer)**
+
+| Arm | Exact match (95% CI) | F1 | vs S2 (95% CI) | LLM calls / question | Prompt tokens |
+| --- | --- | --- | --- | --- | --- |
+| S1 · Single LLM | 18.0% (13.3–22.7) | 30.2 | −21.3 (−27.7 to −15.7) | 1.95 | 1,436 |
+| **S2 · Single agent + calculator** | **39.3% (34.3–45.0)** | **49.8** | baseline | 1.33 | 1,015 |
+| M1 · Learned router + specialists | 30.3% (24.7–36.0) | 49.1 | −9.0 (−15.3 to −2.7) | 1.24 | 950 |
+| M2 · LLM orchestrator + specialists | 30.3% (25.0–36.0) | 49.0 | −9.0 (−15.3 to −2.0) | 2.23 | 1,076 |
+| Oracle · Gold route + specialists | 31.7% (26.3–37.3) | 51.1 | −7.7 (−14.0 to −1.0) | 1.24 | 945 |
+| M3 · Router + specialists + checks | 9.7% (6.0–13.3) | 21.1 | −29.7 (−35.7 to −24.0) | 3.19 | 2,386 |
+
+Router: bge-m3 picks the right specialist for 94% of questions (LLM orchestrator 92.7%), in about 1 ms. M3 abstains on 54% of questions and is right on only 22% of the ones it answers.
+
+Exact match by answer type (number of questions in brackets):
+
+| Arm | Span (139) | Arithmetic (114) | Multi-span (40) | Count (7) |
+| --- | --- | --- | --- | --- |
+| S2 · Single agent + calculator | **41.0%** | 44.7% | 22.5% | 14.3% |
+| M1 · Learned router + specialists | 13.7% | **52.6%** | 27.5% | 14.3% |
+| Oracle · Gold route + specialists | 13.7% | **53.5%** | 32.5% | 28.6% |
+
+**E5 · Memory (ConvFinQA dev, 100 random conversations, 348 turns)**
+
+| Arm | Turn accuracy (95% CI) | Follow-up turns | Turns reusing an earlier result | Whole conversation right | Prompt tokens / turn |
+| --- | --- | --- | --- | --- | --- |
+| No memory | 53.7% (48.6–58.9) | 48.4% | 41.2% | 21% | 260 |
+| **Transcript** | **64.4% (59.5–69.3)** | **63.3%** | **60.6%** | **42%** | 302 |
+| Structured memory | 58.6% (53.2–63.2) | 55.2% | 48.8% | 32% | 323 |
+
+Paired differences: transcript − no memory **+10.6** (CI +6.3 to +15.2); structured − no memory +4.9 (CI +0.9 to +8.9); structured − transcript **−5.7** (CI −9.5 to −2.3). Turn 1 is identical in every arm (67%). After a right previous answer, the next turn is right 77.5% of the time with the transcript, against 53.1% with no memory.
+
+### What the results say
+
+1. **Router + specialists did not beat one agent with a calculator.** Every multi-agent arm is about 9 points below S2, and the confidence intervals are entirely below zero. Even a perfect router (Oracle) loses by 7.7 points, so routing is not the problem: the router is 94% accurate.
+2. **The loss comes from one specialist, not from the design.** The calculator specialist beats S2 on arithmetic (52.6% vs 44.7%), but the lookup specialist scores only 13.7% on single-span questions against S2's 41%. In 74 of M1's answers it returned several cells (for example the 2019 *and* 2018 values) where one was asked for; in 58 of those the right value is in the list. The failure log calls these "text instead of number".
+3. **S2's main error is formatting too.** About 20% of S2's answers have the right value but the wrong scale label, mostly a scale such as "million" attached to a year or a text answer, or a percent/thousand mismatch on calculations. The TAT-QA scorer marks these wrong.
+4. **Both gaps look fixable, so the E4 verdict is provisional.** Combining what each side does best (specialist for arithmetic, S2 for the rest) would already reach about 42.3%, above S2. As a rough upper bound, fixing every multi-cell lookup answer would take M1 to about 49.7%, and fixing every scale error would take S2 to about 59.7%. The fair test is to apply the same formatting fixes to both sides and run E4 again.
+5. **Checks that throw answers away are too strict here.** M3's agreement check needs S1 to agree, and S1 is right only 18% of the time, so M3 throws away most good answers. For TAT-QA the check should compare against S2, not S1.
+6. **Memory clearly matters, and the plain transcript is best.** Keeping the conversation lifts accuracy by 10.6 points and doubles whole-conversation accuracy (21% → 42%) for about 40 extra prompt tokens per turn. The fixed structured memory helps (+4.9) but is 5.7 points below the transcript, at slightly more tokens. Its labelled variables lose the wording of earlier questions, so follow-ups such as "and as a proportion of the total payout?" get the direction wrong (transcript right and structured wrong on 33 turns; the reverse on 13).
+7. **Mistakes carry over.** With any memory, a follow-up after a wrong answer is right only 30–38% of the time. This is the case for showing the "verified" badge from Part 1 on every turn, so a person can catch an early wrong number before building on it.
+
+### Decisions for FinSight (pending the API run)
+
+- Keep **one agent with a calculator** as the default answer path. Use the **calculator specialist** for questions the router labels as arithmetic.
+- Use a **transcript** as conversation memory. Revisit structured memory only for long conversations, where the transcript gets too long.
+- Before the paper, fix the two formatting problems (one cell per single-value lookup; no scale on years and text answers), run E4 again on both backends, and report the before and after.
+
 ## Known limits
 
 - TAT-QA and ConvFinQA are company reports, not personal ledgers. No real public household-ledger dataset exists; a private-ledger benchmark is planned for Part 3.
@@ -133,5 +186,5 @@ Free API tiers change their model names and limits often. If the API stops with 
 ## Research plan
 
 - **Part 1:** grounding components: routing, retrieval, numeric verification. Complete.
-- **Part 2 (this branch):** agents and memory: single agent versus router + specialists versus orchestrator, memory designs, failure modes.
+- **Part 2 (this branch):** agents and memory: single agent versus router + specialists versus orchestrator, memory designs, failure modes. Local run done; API run and a formatting-fix re-run of E4 pending.
 - **Part 3:** safety, households and India: prompt-injection and leakage tests, Hinglish, and the private-ledger benchmark.
