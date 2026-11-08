@@ -299,8 +299,8 @@ FinSight is also a research project. The goal is a paper on assistants that answ
 | [Part 1](https://github.com/Sanskar1724/FinSight_AI/tree/research/part-1-grounding-benchmarks) · Routing | Can embeddings replace rule-based intent routing? | Banking77 | bge-m3 **93.4%** vs 65.5% for the current router (83.8% vs 45.1% with 5 examples per intent) |
 | [Part 1](https://github.com/Sanskar1724/FinSight_AI/tree/research/part-1-grounding-benchmarks) · Search | Which retriever finds the right finance passage? | FiQA (BEIR) | bge-m3 nDCG@10 **0.410** vs 0.236 for BM25 and 0.127 for the current hashed vectors |
 | [Part 1](https://github.com/Sanskar1724/FinSight_AI/tree/research/part-1-grounding-benchmarks) · Numbers | Does computing with code beat answering directly? | FinQA | Reason-then-program **71.0%** vs 48.7% direct; when two methods agree the answer is right 82.6% of the time |
-| [Part 2](https://github.com/Sanskar1724/FinSight_AI/tree/research/part-2-agents-and-memory) · Agents | Do a router and specialist agents beat one agent? | TAT-QA | In progress |
-| [Part 2](https://github.com/Sanskar1724/FinSight_AI/tree/research/part-2-agents-and-memory) · Memory | Which memory design handles follow-up questions best? | ConvFinQA | Remembering the conversation **64.4%** vs 53.7% with no memory; structured memory in progress |
+| [Part 2](https://github.com/Sanskar1724/FinSight_AI/tree/research/part-2-agents-and-memory) · Agents | Do a router and specialist agents beat one agent? | TAT-QA | Not yet: one agent with a calculator scores **39.3%** vs 30.3% for router + specialists. The calculator specialist wins on arithmetic (52.6% vs 44.7%); the gap comes from answer-format errors, which are being fixed before a re-run |
+| [Part 2](https://github.com/Sanskar1724/FinSight_AI/tree/research/part-2-agents-and-memory) · Memory | Which memory design handles follow-up questions best? | ConvFinQA | Remembering the conversation **64.4%** vs 53.7% with no memory and 58.6% with structured memory; whole conversations right 42% vs 21% |
 
 Background reading:
 
