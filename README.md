@@ -151,7 +151,7 @@ Exact match by answer type (number of questions in brackets):
 
 **E4 · Agents, re-run with the formatting fix (same model, same 300 questions, same day)**
 
-The first run's errors were mostly answer formatting, so every arm got the same fix: give one value when one is asked for, do not round, no scale on years, dates, counts or text answers (plus the same scale clean-up after parsing), and the lookup specialist is told "one item" or "several items" by its route. M3 now checks the specialist against S2 instead of S1. The printed output of this run is in [`results/local-qwen7b-2026-11-08-e4-fix/e4_run_log.txt`](results/local-qwen7b-2026-11-08-e4-fix/e4_run_log.txt), and the notebooks on this branch now include the fix.
+The first run's errors were mostly answer formatting, so every arm got the same fix: give one value when one is asked for, do not round, no scale on years, dates, counts or text answers (plus the same scale clean-up after parsing), and the lookup specialist is told "one item" or "several items" by its route. M3 now checks the specialist against S2 instead of S1. The raw outputs of this run are in [`results/local-qwen7b-2026-11-08-e4-fix/`](results/local-qwen7b-2026-11-08-e4-fix/) (E4 tables, every scored item, the generation cache and the printed log; `summary.csv` and `results.json` also carry the first run's E5 rows, which did not change), and the notebooks on this branch now include the fix.
 
 | Arm | Exact match (95% CI) | F1 | vs S2 (95% CI) | LLM calls / question | Tokens / question | Change from first run |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -161,6 +161,16 @@ The first run's errors were mostly answer formatting, so every arm got the same 
 | M2 · LLM orchestrator + specialists | 42.7% (36.7–48.3) | 53.4 | −3.7 (−10.3 to +2.7) | 2.10 | 1,069 | +12.3 |
 | Oracle · Gold route + specialists | 44.3% (38.7–50.0) | **54.4** | −2.0 (−8.7 to +4.3) | 1.11 | 935 | +12.7 |
 | M3 · Router + specialists + checks | 36.0% (30.7–42.0) | 43.7 | −10.3 (−16.7 to −4.3) | 2.57 | 2,165 | +26.3 |
+
+Exact match by answer type after the fix:
+
+| Arm | Span (139) | Arithmetic (114) | Multi-span (40) | Count (7) |
+| --- | --- | --- | --- | --- |
+| S2 · Single agent + calculator | **45.3%** | 48.2% | 45.0% | 42.9% |
+| M1 · Learned router + specialists | 38.1% | 52.6% | 40.0% | 14.3% |
+| Oracle · Gold route + specialists | 37.4% | **53.5%** | 45.0% | 28.6% |
+
+The calculator specialist still beats S2 on arithmetic, and S2 is still better at copying single values. A post-hoc mix that sends questions the learned router labels as arithmetic to the calculator specialist and everything else to S2 scores **47.7%**, +1.3 over S2 (paired 95% CI −3.0 to +5.3), with fewer calls. It was chosen after seeing the results, so it should be added as its own arm and confirmed on the API run before it is claimed.
 
 M3 now answers 75% of questions and is right on 47.8% of those, the same as S2's right-when-answering (47.8%), so the check adds no precision. "Several items for one" fell to about 5% for the specialists (it was about 25%). The biggest remaining errors are a right number with the wrong scale (13–18%) and a wrong number (10–17%). S1 still ran out of room before its Answer line on 253 of 300 questions and needed the extra "final answer now" turn.
 
@@ -186,7 +196,7 @@ Paired differences: transcript − no memory **+10.6** (CI +6.3 to +15.2); struc
 
 ### Decisions for FinSight (pending the API run)
 
-- Use the **learned router + specialists** (M1) as the default answer path: as accurate as one agent within the margin of error, with about 22% fewer tokens, and each specialist can be tested on its own. Keep the single agent with a calculator as the fallback when the router is unsure.
+- Use the **learned router** in front of the answer step: send arithmetic questions to the calculator specialist and the rest to the single agent with a calculator. This is at least as accurate as either alone and cheaper than the single agent; confirm it as a proper arm on the API run.
 - Drop the LLM orchestrator (M2): no more accurate and one extra call per question.
 - Use a **transcript** as conversation memory. Revisit structured memory only for long conversations, where the transcript gets too long.
 - Run the API backend on the fixed notebooks to check that the E4 tie and the E5 memory gain hold on a second model.

@@ -1,0 +1,62 @@
+backend,arm,failure,count,share
+local,S1 · Single LLM,correct,73,0.24333333333333335
+local,S1 · Single LLM,partial span,20,0.06666666666666667
+local,S1 · Single LLM,several items for one,75,0.25
+local,S1 · Single LLM,"right number, wrong scale",28,0.09333333333333334
+local,S1 · Single LLM,wrong number,55,0.18333333333333332
+local,S1 · Single LLM,no answer,28,0.09333333333333334
+local,S1 · Single LLM,percent vs fraction,2,0.006666666666666667
+local,S1 · Single LLM,wrong span,17,0.056666666666666664
+local,S1 · Single LLM,sign error,1,0.0033333333333333335
+local,S1 · Single LLM,text instead of number,1,0.0033333333333333335
+local,S2 · Single agent + calculator,correct,139,0.4633333333333333
+local,S2 · Single agent + calculator,partial span,19,0.06333333333333334
+local,S2 · Single agent + calculator,several items for one,14,0.04666666666666667
+local,S2 · Single agent + calculator,wrong number,52,0.17333333333333334
+local,S2 · Single agent + calculator,"right number, wrong scale",40,0.13333333333333333
+local,S2 · Single agent + calculator,wrong span,18,0.06
+local,S2 · Single agent + calculator,sign error,6,0.02
+local,S2 · Single agent + calculator,no answer,9,0.03
+local,S2 · Single agent + calculator,percent vs fraction,3,0.01
+local,M1 · Learned router + specialists,correct,130,0.43333333333333335
+local,M1 · Learned router + specialists,partial span,26,0.08666666666666667
+local,M1 · Learned router + specialists,"right number, wrong scale",48,0.16
+local,M1 · Learned router + specialists,sign error,7,0.023333333333333334
+local,M1 · Learned router + specialists,program failed,6,0.02
+local,M1 · Learned router + specialists,wrong route,17,0.056666666666666664
+local,M1 · Learned router + specialists,wrong number,31,0.10333333333333333
+local,M1 · Learned router + specialists,wrong span,16,0.05333333333333334
+local,M1 · Learned router + specialists,several items for one,15,0.05
+local,M1 · Learned router + specialists,percent vs fraction,4,0.013333333333333334
+local,M2 · LLM orchestrator + specialists,correct,128,0.4266666666666667
+local,M2 · LLM orchestrator + specialists,partial span,26,0.08666666666666667
+local,M2 · LLM orchestrator + specialists,"right number, wrong scale",45,0.15
+local,M2 · LLM orchestrator + specialists,sign error,7,0.023333333333333334
+local,M2 · LLM orchestrator + specialists,program failed,7,0.023333333333333334
+local,M2 · LLM orchestrator + specialists,wrong number,33,0.11
+local,M2 · LLM orchestrator + specialists,wrong route,18,0.06
+local,M2 · LLM orchestrator + specialists,wrong span,14,0.04666666666666667
+local,M2 · LLM orchestrator + specialists,several items for one,17,0.056666666666666664
+local,M2 · LLM orchestrator + specialists,percent vs fraction,3,0.01
+local,M2 · LLM orchestrator + specialists,text instead of number,2,0.006666666666666667
+local,Oracle · Gold route + specialists,correct,133,0.44333333333333336
+local,Oracle · Gold route + specialists,partial span,26,0.08666666666666667
+local,Oracle · Gold route + specialists,"right number, wrong scale",54,0.18
+local,Oracle · Gold route + specialists,sign error,7,0.023333333333333334
+local,Oracle · Gold route + specialists,program failed,7,0.023333333333333334
+local,Oracle · Gold route + specialists,wrong number,37,0.12333333333333334
+local,Oracle · Gold route + specialists,wrong span,16,0.05333333333333334
+local,Oracle · Gold route + specialists,several items for one,15,0.05
+local,Oracle · Gold route + specialists,percent vs fraction,4,0.013333333333333334
+local,Oracle · Gold route + specialists,text instead of number,1,0.0033333333333333335
+local,M3 · Router + specialists + checks,correct,108,0.36
+local,M3 · Router + specialists + checks,partial span,23,0.07666666666666666
+local,M3 · Router + specialists + checks,abstained,66,0.22
+local,M3 · Router + specialists + checks,"right number, wrong scale",37,0.12333333333333334
+local,M3 · Router + specialists + checks,program failed,6,0.02
+local,M3 · Router + specialists + checks,wrong route,9,0.03
+local,M3 · Router + specialists + checks,wrong number,20,0.06666666666666667
+local,M3 · Router + specialists + checks,sign error,3,0.01
+local,M3 · Router + specialists + checks,several items for one,12,0.04
+local,M3 · Router + specialists + checks,wrong span,15,0.05
+local,M3 · Router + specialists + checks,percent vs fraction,1,0.0033333333333333335
