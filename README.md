@@ -47,7 +47,8 @@ Every LLM arm runs on a **local open model** (Qwen 2.5 7B Instruct in 4-bit, wit
 | **S2** · Single agent + calculator | One agent that can call a calculator tool up to 3 times (ReAct style). The strong single-agent baseline every multi-agent arm is compared against | 1–4 |
 | **M1** · Learned router + specialists | A bge-m3 + logistic regression router (trained on TAT-QA *train* questions, tested on *dev*) sends the question to a **lookup** specialist (copy spans), a **calculator** specialist (Part 1's reason-then-program) or a **counter** specialist (list items, count in code) | 1 |
 | **M2** · LLM orchestrator + specialists | The LLM decides which specialist to call | 2 |
-| **M3** · Router + specialists + checks | M1, but a calculated answer is kept only if it agrees with S1, and a copied span only if it appears verbatim in the report; otherwise it abstains | 2 |
+| **M3** · Router + specialists + checks | M1, but a calculated answer is kept only if it agrees with S2 (S1 in the first local run), and a copied span only if it appears verbatim in the report; otherwise it abstains | 2–5 |
+| **M4** · Router: calculator specialist or S2 | The learned router sends arithmetic questions to the calculator specialist and everything else to S2. Added on 8 Nov 2026 after the local fix re-run suggested it (47.7% post hoc); the API run is its first proper test | 1–4 |
 | **Oracle** · Gold route + specialists | TAT-QA's gold answer type picks the specialist: the ceiling for any router | 1 |
 
 - All arms see the same report (table plus paragraphs) and the same answer rules, including the scale (thousand, million, percent ...), which the official scorer requires.
