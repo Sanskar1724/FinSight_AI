@@ -56,6 +56,10 @@ class User(Base):
     password_reset_tokens: Mapped[list[PasswordResetToken]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
+    accounts: Mapped[list[Account]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    transfers: Mapped[list[AccountTransfer]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
 
 
 class PasswordResetToken(Base):
@@ -103,11 +107,65 @@ class Transaction(Base):
     merchant: Mapped[str] = mapped_column(String(160))
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     payment_method: Mapped[str] = mapped_column(String(40), default="UPI")
+    account_id: Mapped[int | None] = mapped_column(
+        ForeignKey("accounts.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
 
     user: Mapped[User] = relationship(back_populates="transactions")
     category: Mapped[Category] = relationship(back_populates="transactions")
+    account: Mapped[Account | None] = relationship(back_populates="transactions")
+
+
+class Account(Base):
+    """A place money is held or owed: a bank account, card, wallet, cash or loan.
+
+    The balance is never stored. It is the opening balance as of
+    ``opening_date`` plus every linked transaction and transfer on or after that
+    date, so it always agrees with the ledger.
+    """
+
+    __tablename__ = "accounts"
+    __table_args__ = (Index("ix_accounts_user_name", "user_id", "name"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(120))
+    # bank | credit_card | wallet | cash | loan
+    kind: Mapped[str] = mapped_column(String(20), default="bank")
+    institution: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    last4: Mapped[str | None] = mapped_column(String(4), nullable=True)
+    currency: Mapped[str] = mapped_column(String(3), default="INR", server_default="INR")
+    # For assets this is money held; for credit cards and loans it is money owed.
+    opening_balance: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("0"))
+    opening_date: Mapped[date] = mapped_column(Date)
+    credit_limit: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True)
+    is_archived: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+    user: Mapped[User] = relationship(back_populates="accounts")
+    transactions: Mapped[list[Transaction]] = relationship(back_populates="account")
+
+
+class AccountTransfer(Base):
+    """Money moved between two of the user's own accounts, such as paying a
+    credit card bill from a bank account. Transfers change balances but are
+    not income or spending, so analytics and budgets ignore them."""
+
+    __tablename__ = "account_transfers"
+    __table_args__ = (Index("ix_account_transfers_user_date", "user_id", "occurred_on"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    from_account_id: Mapped[int] = mapped_column(ForeignKey("accounts.id", ondelete="CASCADE"), index=True)
+    to_account_id: Mapped[int] = mapped_column(ForeignKey("accounts.id", ondelete="CASCADE"), index=True)
+    amount: Mapped[Decimal] = mapped_column(Numeric(14, 2))
+    occurred_on: Mapped[date] = mapped_column(Date)
+    note: Mapped[str | None] = mapped_column(String(240), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+    user: Mapped[User] = relationship(back_populates="transfers")
 
 
 class Budget(Base):

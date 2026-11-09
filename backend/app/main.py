@@ -15,6 +15,7 @@ from sqlalchemy import select
 
 from app import __version__
 from app.api.routes import (
+    accounts,
     ai,
     analytics,
     auth,
@@ -168,6 +169,7 @@ for router in [
     auth.router,
     categories.router,
     transactions.router,
+    accounts.router,
     budgets.router,
     goals.router,
     dashboard.router,

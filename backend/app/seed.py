@@ -23,6 +23,8 @@ from app.core.config import settings
 from app.core.security import hash_password
 from app.db.base import SessionLocal, utcnow
 from app.models import (
+    Account,
+    AccountTransfer,
     Budget,
     Bill,
     Category,
@@ -510,6 +512,83 @@ def _seed_goals(
     db.flush()
 
 
+def _seed_accounts(db: Session, user: User, today: date) -> None:
+    """Fictional demo accounts. Card payments go to the credit card, cash to the
+    wallet, and everything else to the savings account."""
+    db.flush()
+    txns = db.scalars(select(Transaction).where(Transaction.user_id == user.id)).all()
+    start = min((txn.occurred_on for txn in txns), default=today)
+    savings = Account(
+        user_id=user.id,
+        name="Savings account",
+        kind="bank",
+        institution="HDFC Bank",
+        last4="4821",
+        opening_balance=Decimal("48250.00"),
+        opening_date=start,
+    )
+    card = Account(
+        user_id=user.id,
+        name="Credit card",
+        kind="credit_card",
+        institution="HDFC Bank",
+        last4="9034",
+        opening_balance=Decimal("0.00"),
+        opening_date=start,
+        credit_limit=Decimal("75000.00"),
+    )
+    cash = Account(
+        user_id=user.id,
+        name="Cash wallet",
+        kind="cash",
+        opening_balance=Decimal("2000.00"),
+        opening_date=start,
+    )
+    db.add_all([savings, card, cash])
+    db.flush()
+    by_method = {"Card": card.id, "Cash": cash.id}
+    card_spend: dict[date, Decimal] = {}
+    cash_spend: dict[date, Decimal] = {}
+    for txn in txns:
+        # Income always lands in the bank; spending follows the payment method.
+        txn.account_id = savings.id if txn.type == "income" else by_method.get(txn.payment_method, savings.id)
+        month = txn.occurred_on.replace(day=1)
+        if txn.account_id == card.id:
+            card_spend[month] = card_spend.get(month, Decimal("0")) + Decimal(txn.amount)
+        elif txn.account_id == cash.id:
+            cash_spend[month] = cash_spend.get(month, Decimal("0")) + Decimal(txn.amount)
+    # An ATM withdrawal at the start of each month covers that month's cash spending.
+    for month, amount in sorted(cash_spend.items()):
+        withdrawal = (amount / Decimal("500")).to_integral_value(rounding="ROUND_CEILING") * Decimal("500")
+        db.add(
+            AccountTransfer(
+                user_id=user.id,
+                from_account_id=savings.id,
+                to_account_id=cash.id,
+                amount=q(withdrawal),
+                occurred_on=max(month, start),
+                note="ATM withdrawal (fictional)",
+            )
+        )
+    # Each complete month's card spending is paid from savings on the 5th of the next month.
+    current_month = today.replace(day=1)
+    for month, amount in sorted(card_spend.items()):
+        pay_on = (month + timedelta(days=32)).replace(day=5)
+        if month >= current_month or pay_on > today:
+            continue
+        db.add(
+            AccountTransfer(
+                user_id=user.id,
+                from_account_id=savings.id,
+                to_account_id=card.id,
+                amount=q(amount),
+                occurred_on=pay_on,
+                note="Credit card bill payment (fictional)",
+            )
+        )
+    db.flush()
+
+
 def _seed_bills(db: Session, user: User, today: date) -> None:
     db.add_all(
         [
@@ -559,6 +638,7 @@ def seed_demo(db: Session, reset: bool = False) -> User:
     categories = seed_reference_data(db)
     db.add(NotificationPreference(user_id=demo.id))
     _seed_transactions(db, demo, categories, today)
+    _seed_accounts(db, demo, today)
     _seed_budgets(db, demo, categories, today)
     _seed_goals(db, demo, categories, today)
     _seed_bills(db, demo, today)

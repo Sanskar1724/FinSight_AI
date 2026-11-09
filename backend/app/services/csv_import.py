@@ -217,7 +217,9 @@ def parse_csv(
     return ParseResult(rows=rows, headers=headers, detected_columns=detected)
 
 
-def import_rows(db: Session, user: User, parse_result: ParseResult) -> dict:
+def import_rows(
+    db: Session, user: User, parse_result: ParseResult, account_id: int | None = None
+) -> dict:
     imported = 0
     skipped = 0
     failed = 0
@@ -248,6 +250,7 @@ def import_rows(db: Session, user: User, parse_result: ParseResult) -> dict:
                 merchant=data["merchant"][:160],
                 notes=data.get("notes"),
                 payment_method=(data.get("payment_method") or "UPI")[:40],
+                account_id=account_id,
             )
         )
         existing.add(signature)

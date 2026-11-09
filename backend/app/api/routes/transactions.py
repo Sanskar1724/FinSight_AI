@@ -29,6 +29,7 @@ from app.schemas import (
     TransactionSuggestion,
     TransactionUpdate,
 )
+from app.services.accounts import owned_account
 from app.services.csv_import import import_rows, parse_csv
 from app.services.csv_safety import csv_text
 from app.services.finance import detect_anomalies, q
@@ -50,6 +51,11 @@ def _validate_type_and_category(db: Session, txn_type: str, category_id: int) ->
     resolve_category(db, category_id, txn_type)
 
 
+def _validate_account(db: Session, user: User, account_id: int | None) -> None:
+    if account_id is not None and owned_account(db, user.id, account_id) is None:
+        raise HTTPException(status_code=422, detail="Account not found")
+
+
 def _evaluate_after_change(db: Session, user: User) -> None:
     try:
         evaluate_notifications(db, user)
@@ -69,8 +75,14 @@ def _query_transactions(
     search: str | None,
     flagged: str | None,
     sort: str,
+    account_id: int | None = None,
 ):
     conditions = [Transaction.user_id == user.id]
+    if account_id is not None:
+        # 0 selects transactions not linked to any account.
+        conditions.append(
+            Transaction.account_id.is_(None) if account_id == 0 else Transaction.account_id == account_id
+        )
     if start:
         conditions.append(Transaction.occurred_on >= start)
     if end:
@@ -126,6 +138,7 @@ def list_transactions(
     category_id: int | None = None,
     search: str | None = Query(default=None, max_length=120),
     flagged: str | None = None,
+    account_id: int | None = Query(default=None, ge=0),
     sort: str = Query(default="date_desc", pattern="^(date|amount)_(asc|desc)$"),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
@@ -144,6 +157,7 @@ def list_transactions(
         search=search,
         flagged=flagged,
         sort=sort,
+        account_id=account_id,
     )
     total = int(db.scalar(count_statement) or 0)
     rows = db.scalars(statement.offset((page - 1) * page_size).limit(page_size)).all()
@@ -165,6 +179,7 @@ def create_transaction(
     db: Session = Depends(get_db),
 ) -> TransactionOut:
     _validate_type_and_category(db, payload.type, payload.category_id)
+    _validate_account(db, user, payload.account_id)
     txn = Transaction(
         user_id=user.id,
         type=payload.type,
@@ -174,6 +189,7 @@ def create_transaction(
         merchant=payload.merchant.strip(),
         notes=payload.notes.strip() if payload.notes else None,
         payment_method=payload.payment_method.strip() or "UPI",
+        account_id=payload.account_id,
     )
     if not txn.merchant:
         raise HTTPException(status_code=422, detail="Merchant cannot be empty")
@@ -217,6 +233,7 @@ def suggest_transaction_fields(
         type=match.type,
         category_id=match.category_id,
         payment_method=match.payment_method,
+        account_id=match.account_id,
     )
 
 
@@ -228,6 +245,7 @@ def export_transactions(
     category_id: int | None = None,
     search: str | None = Query(default=None, max_length=120),
     flagged: str | None = None,
+    account_id: int | None = Query(default=None, ge=0),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> StreamingResponse:
@@ -241,11 +259,12 @@ def export_transactions(
         search=search,
         flagged=flagged,
         sort="date_desc",
+        account_id=account_id,
     )
-    rows = db.scalars(statement).all()
+    rows = db.scalars(statement.options(joinedload(Transaction.account))).all()
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow(["date", "type", "amount", "category", "merchant", "payment_method", "notes"])
+    writer.writerow(["date", "type", "amount", "category", "merchant", "payment_method", "notes", "account"])
 
     for row in rows:
         writer.writerow(
@@ -257,6 +276,7 @@ def export_transactions(
                 csv_text(row.merchant),
                 csv_text(row.payment_method),
                 csv_text(row.notes),
+                csv_text(row.account.name if row.account else None),
             ]
         )
     content = "\ufeff" + output.getvalue()
@@ -312,9 +332,11 @@ def preview_import(
 @router.post("/import", response_model=CSVImportResponse)
 def import_transactions(
     file: UploadFile = File(...),
+    account_id: int | None = Query(default=None, ge=1),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> CSVImportResponse:
+    _validate_account(db, user, account_id)
     content = _read_upload(file)
     digest = hashlib.sha256(content).hexdigest()[:16]
     try:
@@ -332,7 +354,7 @@ def import_transactions(
         )
         db.commit()
         raise HTTPException(status_code=422, detail=str(exc)) from None
-    result = import_rows(db, user, parsed)
+    result = import_rows(db, user, parsed, account_id=account_id)
     summary = (
         f"Imported {result['imported']} row(s); skipped {result['skipped_duplicates']} duplicate(s); "
         f"{result['failed']} row(s) failed validation."
@@ -388,6 +410,8 @@ def update_transaction(
     new_type = updates.get("type", txn.type)
     new_category_id = updates.get("category_id", txn.category_id)
     _validate_type_and_category(db, new_type, new_category_id)
+    if "account_id" in updates:
+        _validate_account(db, user, updates["account_id"])
     if "amount" in updates and updates["amount"] is not None:
         updates["amount"] = q(Decimal(str(updates["amount"])))
     if "merchant" in updates and updates["merchant"] is not None:
