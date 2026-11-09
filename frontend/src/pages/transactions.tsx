@@ -32,7 +32,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Spin } from "@/components/ui/spin";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { api, ApiError, buildQuery, downloadBlob } from "@/lib/api";
-import type { Category, Transaction, TransactionPage, TransactionType } from "@/lib/types";
+import { accountLabel } from "@/lib/accounts";
+import type { AccountList, Category, Transaction, TransactionPage, TransactionType } from "@/lib/types";
 import { cn, formatDate, formatINR, todayISO } from "@/lib/utils";
 
 const PAGE_SIZE = 15;
@@ -45,6 +46,7 @@ export default function TransactionsPage() {
   const debouncedSearch = useDebouncedValue(search);
   const [type, setType] = useState<"" | TransactionType>("");
   const [categoryId, setCategoryId] = useState("");
+  const [accountId, setAccountId] = useState("");
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
   const [flagged, setFlagged] = useState("");
@@ -89,12 +91,18 @@ export default function TransactionsPage() {
       next.delete("category");
       changed = true;
     }
+    const accountParam = next.get("account");
+    if (accountParam && /^\d+$/.test(accountParam)) {
+      setAccountId(accountParam);
+      next.delete("account");
+      changed = true;
+    }
     if (changed) setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams]);
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, type, categoryId, start, end, flagged, sort]);
+  }, [debouncedSearch, type, categoryId, accountId, start, end, flagged, sort]);
 
   const categoriesQuery = useQuery({
     queryKey: ["categories"],
@@ -102,10 +110,18 @@ export default function TransactionsPage() {
     staleTime: 10 * 60 * 1000,
   });
 
+  const accountsQuery = useQuery({
+    queryKey: ["accounts"],
+    queryFn: () => api.get<AccountList>("/accounts"),
+    staleTime: 60 * 1000,
+  });
+  const accountOptions = accountsQuery.data?.accounts ?? [];
+  const accountNames = new Map(accountOptions.map((account) => [account.id, accountLabel(account)]));
+
   const query = useQuery({
     queryKey: [
       "transactions",
-      { search: debouncedSearch, type, categoryId, start, end, flagged, sort, page },
+      { search: debouncedSearch, type, categoryId, accountId, start, end, flagged, sort, page },
     ],
     queryFn: () =>
       api.get<TransactionPage>(
@@ -113,6 +129,7 @@ export default function TransactionsPage() {
           search: debouncedSearch || undefined,
           type: type || undefined,
           category_id: categoryId || undefined,
+          account_id: accountId || undefined,
           start: start || undefined,
           end: end || undefined,
           flagged: flagged || undefined,
@@ -130,6 +147,7 @@ export default function TransactionsPage() {
     void queryClient.invalidateQueries({ queryKey: ["analytics"] });
     void queryClient.invalidateQueries({ queryKey: ["budgets"] });
     void queryClient.invalidateQueries({ queryKey: ["notifications"] });
+    void queryClient.invalidateQueries({ queryKey: ["accounts"] });
   };
 
   const deleteMutation = useMutation({
@@ -152,6 +170,7 @@ export default function TransactionsPage() {
           search: debouncedSearch || undefined,
           type: type || undefined,
           category_id: categoryId || undefined,
+          account_id: accountId || undefined,
           start: start || undefined,
           end: end || undefined,
           flagged: flagged || undefined,
@@ -166,7 +185,7 @@ export default function TransactionsPage() {
     }
   };
 
-  const activeFilters = [type, categoryId, start, end, flagged].filter(Boolean).length;
+  const activeFilters = [type, categoryId, accountId, start, end, flagged].filter(Boolean).length;
   const rows = query.data?.items ?? [];
   const total = query.data?.total ?? 0;
   const pages = query.data?.pages ?? 1;
@@ -177,6 +196,7 @@ export default function TransactionsPage() {
     setSearch("");
     setType("");
     setCategoryId("");
+    setAccountId("");
     setStart("");
     setEnd("");
     setFlagged("");
@@ -292,6 +312,20 @@ export default function TransactionsPage() {
               </div>
               <div className="space-y-1">
                 <label className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Account
+                </label>
+                <Select value={accountId} onChange={(event) => setAccountId(event.target.value)}>
+                  <option value="">All accounts</option>
+                  <option value="0">Not linked to an account</option>
+                  {accountOptions.map((account) => (
+                    <option key={account.id} value={account.id}>
+                      {accountLabel(account)}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                   From
                 </label>
                 <Input
@@ -325,7 +359,7 @@ export default function TransactionsPage() {
             </div>
           )}
 
-          {(categoryId || flagged) && (
+          {(categoryId || accountId || flagged) && (
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <span className="text-[10px] text-muted-foreground">Active:</span>
               {categoryId && (
@@ -336,6 +370,16 @@ export default function TransactionsPage() {
                 >
                   {(categoriesQuery.data ?? []).find((item) => String(item.id) === categoryId)?.name ??
                     "Category"}
+                  <X className="size-3" />
+                </button>
+              )}
+              {accountId && (
+                <button
+                  type="button"
+                  onClick={() => setAccountId("")}
+                  className="inline-flex items-center gap-1 rounded-full border border-primary/15 bg-primary/5 px-2.5 py-1 text-[10px] font-semibold text-primary"
+                >
+                  {accountId === "0" ? "Not linked" : (accountNames.get(Number(accountId)) ?? "Account")}
                   <X className="size-3" />
                 </button>
               )}
@@ -440,6 +484,11 @@ export default function TransactionsPage() {
                       </td>
                       <td className="whitespace-nowrap px-3 py-3.5 text-[11px] text-muted-foreground">
                         {txn.payment_method}
+                        {txn.account_id !== null && accountNames.has(txn.account_id) && (
+                          <span className="block text-[10px] text-muted-foreground/80">
+                            {accountNames.get(txn.account_id)}
+                          </span>
+                        )}
                       </td>
                       <td
                         className={cn(
@@ -509,6 +558,9 @@ export default function TransactionsPage() {
                         <div className="mt-2.5 flex items-center justify-between">
                           <span className="rounded bg-secondary px-2 py-0.5 text-[9px] font-medium text-muted-foreground">
                             {txn.payment_method}
+                            {txn.account_id !== null && accountNames.has(txn.account_id)
+                              ? ` · ${accountNames.get(txn.account_id)}`
+                              : ""}
                           </span>
                           <div className="flex gap-1">
                             <Button

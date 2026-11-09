@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertCircle,
   CheckCircle2,
@@ -19,9 +19,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
 import { Spin } from "@/components/ui/spin";
-import { api, ApiError } from "@/lib/api";
-import type { CSVImportResult, CSVPreview } from "@/lib/types";
+import { accountLabel } from "@/lib/accounts";
+import { api, ApiError, buildQuery } from "@/lib/api";
+import type { AccountList, CSVImportResult, CSVPreview } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 interface CsvImportDialogProps {
@@ -42,6 +45,14 @@ export function CsvImportDialog({ open, onOpenChange }: CsvImportDialogProps) {
   const [result, setResult] = useState<CSVImportResult | null>(null);
   const [error, setError] = useState("");
   const [dragging, setDragging] = useState(false);
+  const [accountId, setAccountId] = useState("");
+  const accountsQuery = useQuery({
+    queryKey: ["accounts"],
+    queryFn: () => api.get<AccountList>("/accounts"),
+    enabled: open,
+    staleTime: 60 * 1000,
+  });
+  const accounts = (accountsQuery.data?.accounts ?? []).filter((account) => !account.is_archived);
 
   const reset = () => {
     setFile(null);
@@ -88,7 +99,10 @@ export function CsvImportDialog({ open, onOpenChange }: CsvImportDialogProps) {
     mutationFn: (nextFile: File) => {
       const form = new FormData();
       form.append("file", nextFile);
-      return api.post<CSVImportResult>("/transactions/import", form);
+      return api.post<CSVImportResult>(
+        `/transactions/import${buildQuery({ account_id: accountId || undefined })}`,
+        form,
+      );
     },
     onSuccess: (data) => {
       setResult(data);
@@ -98,6 +112,7 @@ export function CsvImportDialog({ open, onOpenChange }: CsvImportDialogProps) {
       void queryClient.invalidateQueries({ queryKey: ["analytics"] });
       void queryClient.invalidateQueries({ queryKey: ["budgets"] });
       void queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      void queryClient.invalidateQueries({ queryKey: ["accounts"] });
     },
     onError: (err) => setError(err instanceof ApiError ? err.message : "Import failed"),
   });
@@ -240,6 +255,22 @@ export function CsvImportDialog({ open, onOpenChange }: CsvImportDialogProps) {
 
         {preview && !result && (
           <div className="space-y-3">
+            {accounts.length > 0 && (
+              <div className="space-y-1.5">
+                <Label htmlFor="csv-account">
+                  Link imported rows to an account{" "}
+                  <span className="font-normal text-muted-foreground">(optional)</span>
+                </Label>
+                <Select id="csv-account" value={accountId} onChange={(event) => setAccountId(event.target.value)}>
+                  <option value="">Don't link</option>
+                  {accounts.map((account) => (
+                    <option key={account.id} value={account.id}>
+                      {accountLabel(account)}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+            )}
             <div className="grid grid-cols-3 gap-2">
               <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
                 <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-700">

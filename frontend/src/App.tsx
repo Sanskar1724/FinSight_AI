@@ -6,6 +6,7 @@ import { AppShell } from "@/components/app-shell";
 import { ProtectedRoute, PublicOnlyRoute } from "@/components/auth-guard";
 import { FullPageLoader } from "@/components/ui/spin";
 
+const AccountsPage = lazy(() => import("@/pages/accounts"));
 const AnalyticsPage = lazy(() => import("@/pages/analytics"));
 const AssistantPage = lazy(() => import("@/pages/assistant"));
 const BudgetsPage = lazy(() => import("@/pages/budgets"));
@@ -35,6 +36,7 @@ const titles: Record<string, string> = {
   "/reset-password": "Choose a new password — FinSight AI",
   "/app": "Overview — FinSight AI",
   "/app/transactions": "Transactions — FinSight AI",
+  "/app/accounts": "Accounts — FinSight AI",
   "/app/budgets": "Budgets — FinSight AI",
   "/app/goals": "Goals — FinSight AI",
   "/app/analytics": "Analytics — FinSight AI",
@@ -140,6 +142,14 @@ export default function App() {
               element={
                 <PageSuspense>
                   <TransactionsPage />
+                </PageSuspense>
+              }
+            />
+            <Route
+              path="accounts"
+              element={
+                <PageSuspense>
+                  <AccountsPage />
                 </PageSuspense>
               }
             />

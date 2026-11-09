@@ -33,6 +33,7 @@ export interface Transaction {
   merchant: string;
   notes: string | null;
   payment_method: string;
+  account_id: number | null;
   category: Category;
   created_at: string;
 }
@@ -53,6 +54,7 @@ export interface TransactionPayload {
   merchant: string;
   notes?: string;
   payment_method: string;
+  account_id: number | null;
 }
 
 export interface CSVRowPreview {
@@ -224,6 +226,7 @@ export interface TransactionSuggestion {
   type: TransactionType | null;
   category_id: number | null;
   payment_method: string | null;
+  account_id: number | null;
 }
 
 export interface TrendPoint {
@@ -557,4 +560,52 @@ export interface ResearchRun {
 export interface ResearchRunDetail extends ResearchRun {
   responses: ResearchResponse[];
   case_lookup: Record<string, ResearchCase>;
+}
+
+export type AccountKind = "bank" | "credit_card" | "wallet" | "cash" | "loan";
+
+export interface Account {
+  id: number;
+  name: string;
+  kind: AccountKind;
+  is_liability: boolean;
+  institution: string | null;
+  last4: string | null;
+  currency: string;
+  opening_balance: number;
+  opening_date: string;
+  credit_limit: number | null;
+  is_archived: boolean;
+  /** Money held for assets; money owed for credit cards and loans. */
+  balance: number;
+  net_worth_contribution: number;
+  inflow: number;
+  outflow: number;
+  transaction_count: number;
+  last_activity: string | null;
+  credit_utilisation_pct: number | null;
+}
+
+export interface NetWorthSummary {
+  assets: number;
+  liabilities: number;
+  net_worth: number;
+  account_count: number;
+  unassigned_transactions: number;
+  as_of: string;
+  method: string;
+}
+
+export interface AccountList {
+  accounts: Account[];
+  summary: NetWorthSummary;
+}
+
+export interface AccountTransfer {
+  id: number;
+  from_account_id: number;
+  to_account_id: number;
+  amount: number;
+  occurred_on: string;
+  note: string | null;
 }

@@ -231,6 +231,7 @@ def test_suggest_uses_latest_matching_merchant(client: TestClient) -> None:
         "type": None,
         "category_id": None,
         "payment_method": None,
+        "account_id": None,
     }
 
 

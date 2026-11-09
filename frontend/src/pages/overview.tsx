@@ -43,7 +43,7 @@ import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/hooks/use-auth";
 import { api, ApiError } from "@/lib/api";
-import type { Dashboard } from "@/lib/types";
+import type { AccountList, Dashboard } from "@/lib/types";
 import {
   appHref,
   cn,
@@ -90,6 +90,51 @@ function OverviewSkeleton() {
         <Skeleton className="h-[300px] rounded-2xl lg:col-span-4" />
       </div>
     </div>
+  );
+}
+
+function NetWorthStrip() {
+  const accountsQuery = useQuery({
+    queryKey: ["accounts"],
+    queryFn: () => api.get<AccountList>("/accounts"),
+  });
+  const summary = accountsQuery.data?.summary;
+  if (accountsQuery.isLoading) return <Skeleton className="h-[72px] rounded-2xl" />;
+  if (!summary) return null;
+  if (summary.account_count === 0) {
+    return (
+      <Card className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-sm font-semibold">See your net worth</p>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">
+            Add your bank accounts, cards and cash to track balances alongside your spending.
+          </p>
+        </div>
+        <Button size="sm" variant="outline" asChild>
+          <Link to="/app/accounts?new=1">Add an account</Link>
+        </Button>
+      </Card>
+    );
+  }
+  return (
+    <Link to="/app/accounts" className="block rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30">
+      <Card className="grid grid-cols-3 gap-3 p-4 transition-all hover:shadow-lift sm:p-5">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.11em] text-muted-foreground">Net worth</p>
+          <p className="mt-1 text-lg font-semibold tracking-[-0.03em] tabular sm:text-xl">
+            {formatINR(summary.net_worth)}
+          </p>
+        </div>
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.11em] text-muted-foreground">You have</p>
+          <p className="mt-1 text-sm font-semibold tabular sm:text-base">{formatINR(summary.assets)}</p>
+        </div>
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.11em] text-muted-foreground">You owe</p>
+          <p className="mt-1 text-sm font-semibold tabular sm:text-base">{formatINR(summary.liabilities)}</p>
+        </div>
+      </Card>
+    </Link>
   );
 }
 
@@ -201,6 +246,8 @@ export default function OverviewPage() {
           </div>
         </Card>
       )}
+
+      <NetWorthStrip />
 
       <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         <MetricCard

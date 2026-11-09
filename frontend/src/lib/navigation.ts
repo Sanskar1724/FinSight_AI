@@ -1,6 +1,7 @@
 import {
   ArrowLeftRight,
   Bell,
+  Landmark,
   ChartNoAxesCombined,
   FlaskConical,
   LayoutDashboard,
@@ -31,6 +32,12 @@ export const navigation: { label: string; items: NavItem[] }[] = [
         label: "Transactions",
         icon: ArrowLeftRight,
         keywords: "ledger expenses income spending",
+      },
+      {
+        to: "/app/accounts",
+        label: "Accounts",
+        icon: Landmark,
+        keywords: "bank card wallet cash balance net worth transfer",
       },
       { to: "/app/budgets", label: "Budgets", icon: WalletCards, keywords: "limits categories" },
       { to: "/app/goals", label: "Goals", icon: Target, keywords: "savings target" },

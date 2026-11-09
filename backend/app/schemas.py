@@ -95,6 +95,7 @@ class TransactionCreate(BaseModel):
     merchant: str = Field(min_length=1, max_length=160)
     notes: str | None = Field(default=None, max_length=2000)
     payment_method: str = Field(default="UPI", max_length=40)
+    account_id: int | None = None
 
 
 class TransactionUpdate(BaseModel):
@@ -105,6 +106,7 @@ class TransactionUpdate(BaseModel):
     merchant: str | None = Field(default=None, min_length=1, max_length=160)
     notes: str | None = Field(default=None, max_length=2000)
     payment_method: str | None = Field(default=None, max_length=40)
+    account_id: int | None = None
 
     @field_validator("amount")
     @classmethod
@@ -122,6 +124,7 @@ class TransactionOut(ORMModel):
     merchant: str
     notes: str | None
     payment_method: str
+    account_id: int | None = None
     category: CategoryOut
     created_at: datetime
 
@@ -141,6 +144,7 @@ class TransactionSuggestion(BaseModel):
     type: Literal["income", "expense"] | None = None
     category_id: int | None = None
     payment_method: str | None = None
+    account_id: int | None = None
 
 
 class CSVRowPreview(BaseModel):
@@ -165,6 +169,88 @@ class CSVImportResponse(BaseModel):
     skipped_duplicates: int
     failed: int
     errors: list[str]
+
+
+# ---------- Accounts ----------
+AccountKind = Literal["bank", "credit_card", "wallet", "cash", "loan"]
+LIABILITY_KINDS = {"credit_card", "loan"}
+_MAX_MONEY = Decimal("999999999999.99")
+
+
+class AccountCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    kind: AccountKind = "bank"
+    institution: str | None = Field(default=None, max_length=120)
+    last4: str | None = Field(default=None, pattern=r"^\d{4}$")
+    opening_balance: Decimal = Field(default=Decimal("0"), ge=-_MAX_MONEY, le=_MAX_MONEY, decimal_places=2)
+    opening_date: date
+    credit_limit: Decimal | None = Field(default=None, ge=0, le=_MAX_MONEY, decimal_places=2)
+
+
+class AccountUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=120)
+    kind: AccountKind | None = None
+    institution: str | None = Field(default=None, max_length=120)
+    last4: str | None = Field(default=None, pattern=r"^\d{4}$")
+    opening_balance: Decimal | None = Field(default=None, ge=-_MAX_MONEY, le=_MAX_MONEY, decimal_places=2)
+    opening_date: date | None = None
+    credit_limit: Decimal | None = Field(default=None, ge=0, le=_MAX_MONEY, decimal_places=2)
+    is_archived: bool | None = None
+
+
+class AccountOut(BaseModel):
+    id: int
+    name: str
+    kind: str
+    is_liability: bool
+    institution: str | None
+    last4: str | None
+    currency: str
+    opening_balance: Money
+    opening_date: date
+    credit_limit: Money | None
+    is_archived: bool
+    # Money held for assets; money owed for credit cards and loans.
+    balance: Money
+    # The balance as it counts towards net worth (negative for money owed).
+    net_worth_contribution: Money
+    inflow: Money
+    outflow: Money
+    transaction_count: int
+    last_activity: date | None
+    credit_utilisation_pct: float | None
+
+
+class NetWorthSummary(BaseModel):
+    assets: Money
+    liabilities: Money
+    net_worth: Money
+    account_count: int
+    unassigned_transactions: int
+    as_of: date
+    method: str
+
+
+class AccountListResponse(BaseModel):
+    accounts: list[AccountOut]
+    summary: NetWorthSummary
+
+
+class TransferCreate(BaseModel):
+    from_account_id: int
+    to_account_id: int
+    amount: Decimal = Field(gt=0, le=_MAX_MONEY, decimal_places=2)
+    occurred_on: date
+    note: str | None = Field(default=None, max_length=240)
+
+
+class TransferOut(ORMModel):
+    id: int
+    from_account_id: int
+    to_account_id: int
+    amount: Money
+    occurred_on: date
+    note: str | None
 
 
 # ---------- Budgets ----------

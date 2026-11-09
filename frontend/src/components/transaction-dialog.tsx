@@ -18,7 +18,9 @@ import { Select } from "@/components/ui/select";
 import { Spin } from "@/components/ui/spin";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { api, ApiError, buildQuery } from "@/lib/api";
+import { accountLabel } from "@/lib/accounts";
 import type {
+  AccountList,
   Category,
   Transaction,
   TransactionPayload,
@@ -59,10 +61,11 @@ export function TransactionDialog({
   const [merchant, setMerchant] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("UPI");
+  const [accountId, setAccountId] = useState("");
   const [notes, setNotes] = useState("");
   const [error, setError] = useState("");
   // Fields the user picked by hand are never overwritten by suggestions.
-  const [touched, setTouched] = useState({ category: false, method: false });
+  const [touched, setTouched] = useState({ category: false, method: false, account: false });
   const [suggested, setSuggested] = useState(false);
   const debouncedMerchant = useDebouncedValue(merchant.trim(), 350);
 
@@ -73,6 +76,16 @@ export function TransactionDialog({
   });
 
   const categories = (categoriesQuery.data ?? []).filter((category) => category.kind === type);
+  const accountsQuery = useQuery({
+    queryKey: ["accounts"],
+    queryFn: () => api.get<AccountList>("/accounts"),
+    enabled: open,
+    staleTime: 60 * 1000,
+  });
+  const activeAccounts = (accountsQuery.data?.accounts ?? []).filter(
+    (account) => !account.is_archived || String(account.id) === accountId,
+  );
+
   const methodOptions = paymentMethods.includes(paymentMethod)
     ? paymentMethods
     : [paymentMethod, ...paymentMethods];
@@ -97,6 +110,7 @@ export function TransactionDialog({
       setMerchant(transaction.merchant);
       setCategoryId(String(transaction.category.id));
       setPaymentMethod(transaction.payment_method);
+      setAccountId(transaction.account_id !== null ? String(transaction.account_id) : "");
       setNotes(transaction.notes ?? "");
     } else {
       setType(defaultType);
@@ -105,9 +119,10 @@ export function TransactionDialog({
       setMerchant("");
       setCategoryId("");
       setPaymentMethod("UPI");
+      setAccountId("");
       setNotes("");
     }
-    setTouched({ category: false, method: false });
+    setTouched({ category: false, method: false, account: false });
     setSuggested(false);
   }, [open, transaction, defaultType]);
 
@@ -129,6 +144,15 @@ export function TransactionDialog({
       setPaymentMethod(suggestion.payment_method);
       applied = true;
     }
+    if (
+      !touched.account &&
+      suggestion.account_id &&
+      !accountId &&
+      (accountsQuery.data?.accounts ?? []).some((a) => a.id === suggestion.account_id && !a.is_archived)
+    ) {
+      setAccountId(String(suggestion.account_id));
+      applied = true;
+    }
     if (applied) setSuggested(true);
     // Only react to a new suggestion, not to the fields it sets.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -147,6 +171,7 @@ export function TransactionDialog({
       void queryClient.invalidateQueries({ queryKey: ["budgets"] });
       void queryClient.invalidateQueries({ queryKey: ["goals"] });
       void queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      void queryClient.invalidateQueries({ queryKey: ["accounts"] });
       onOpenChange(false);
     },
     onError: (err) => {
@@ -177,6 +202,7 @@ export function TransactionDialog({
       merchant: merchant.trim(),
       notes: notes.trim() || undefined,
       payment_method: paymentMethod,
+      account_id: accountId ? Number(accountId) : null,
     });
   };
 
@@ -290,6 +316,7 @@ export function TransactionDialog({
           </div>
         </div>
 
+        <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
           <Label htmlFor="txn-method">Payment method</Label>
           <Select
@@ -306,6 +333,24 @@ export function TransactionDialog({
               </option>
             ))}
           </Select>
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="txn-account">
+            Account <span className="font-normal text-muted-foreground">(optional)</span>
+          </Label>
+          <Select id="txn-account" value={accountId} onChange={(event) => {
+              setAccountId(event.target.value);
+              setTouched((current) => ({ ...current, account: true }));
+            }}
+          >
+            <option value="">Not linked</option>
+            {activeAccounts.map((account) => (
+              <option key={account.id} value={account.id}>
+                {accountLabel(account)}
+              </option>
+            ))}
+          </Select>
+        </div>
         </div>
 
         <div className="space-y-1.5">

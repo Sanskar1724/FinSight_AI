@@ -82,10 +82,24 @@ def test_ai_budget_risk_question_returns_only_at_risk_budgets(client: TestClient
     )
     assert response.status_code == 200
     answer = response.json()["answer"]
-    assert "Shopping" in answer
-    assert "Food & Dining" in answer
-    assert "Groceries" not in answer
-    assert "Rent" not in answer
+    # A budget is at risk when it is critical or exceeded, or when its projection
+    # goes over the limit. Projections depend on the day of the month, so the
+    # expected set is derived from the budgets API rather than hard-coded.
+    budgets = client.get("/api/budgets").json()["items"][:6]
+    at_risk = {
+        item["category"]["name"]
+        for item in budgets
+        if item["status"] in {"critical", "exceeded"}
+        or (item["risk"] and item["risk"]["projected_utilization"] > 100)
+    }
+    assert at_risk, "the demo data should always have at least one budget at risk"
+    for item in budgets:
+        name = item["category"]["name"]
+        if name in at_risk:
+            assert f"- {name}:" in answer
+        else:
+            assert f"- {name}:" not in answer
+    assert "Shopping" in at_risk
 
 
 def test_research_run_executes_real_scored_responses(client: TestClient) -> None:
