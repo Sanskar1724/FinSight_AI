@@ -200,7 +200,7 @@ class StatementPreviewRow(BaseModel):
 
 
 class StatementPreviewResponse(BaseModel):
-    statement_type: Literal["bank", "credit_card"]
+    statement_type: Literal["bank", "credit_card", "upi_app"]
     bank: str | None
     account_last4: str | None
     suggested_account_id: int | None

@@ -177,8 +177,9 @@ export function StatementImportDialog({ open, onOpenChange }: StatementImportDia
         <DialogHeader>
           <DialogTitle>Import a bank or card statement</DialogTitle>
           <DialogDescription>
-            Upload the PDF your bank emails or lets you download. FinSight reads it on the server, suggests a
-            merchant and category for each row, and lets you review everything before saving. The PDF and its
+            Upload the PDF your bank emails or lets you download, or a statement exported from a UPI app such as
+            PhonePe, Google Pay, Paytm or Navi. FinSight reads it on the server, suggests a merchant and category
+            for each row, flags payments already in your ledger, and lets you review everything before saving. The PDF and its
             password are not stored.
           </DialogDescription>
         </DialogHeader>
@@ -214,7 +215,7 @@ export function StatementImportDialog({ open, onOpenChange }: StatementImportDia
             <p className="mt-1 text-[11px] text-muted-foreground">
               {previewMutation.isPending
                 ? "Reading the statement…"
-                : "Text PDFs from SBI, HDFC, ICICI, Axis, Kotak and most other banks · up to 10 MB"}
+                : "Text PDFs from SBI, HDFC, ICICI, Axis, Kotak and most banks, or PhonePe, Google Pay, Paytm and Navi · up to 10 MB"}
             </p>
             {!previewMutation.isPending && (
               <Button type="button" variant="outline" size="sm" className="mt-4" onClick={() => inputRef.current?.click()}>
@@ -265,9 +266,10 @@ export function StatementImportDialog({ open, onOpenChange }: StatementImportDia
           <div className="space-y-3">
             <div className="flex flex-wrap items-center gap-2 text-[11px]">
               <span className="rounded-full bg-secondary px-2.5 py-1 font-semibold">
-                {preview.bank ?? "Unknown bank"}
+                {preview.bank ?? (preview.statement_type === "upi_app" ? "UPI app" : "Unknown bank")}
                 {preview.account_last4 ? ` ·· ${preview.account_last4}` : ""}
                 {preview.statement_type === "credit_card" ? " · credit card" : ""}
+                {preview.statement_type === "upi_app" ? " · UPI app" : ""}
               </span>
               {preview.period_start && (
                 <span className="rounded-full bg-secondary px-2.5 py-1">

@@ -91,6 +91,18 @@ INCOME_RULES: list[tuple[tuple[str, ...], str]] = [
 CHARGE_WORDS = re.compile(r"\b(chrg|chg|charges?|fee|gst|sms\s*alert|amc|penalty|min\s*bal)\b", re.I)
 
 
+_APP_PHRASE = re.compile(
+    r"^(?:paid\s+to|sent\s+to|money\s+sent\s+to|payment\s+to|transferred\s+to|received\s+from|"
+    r"money\s+received\s+from|bill\s+paid\s*[-:]?|recharged?\s*(?:of|for)?|paid\s+for)\s*(?P<payee>.+)$",
+    re.I,
+)
+_APP_DETAILS = re.compile(
+    r"\s+(?:transaction\s*id|txn\s*id|utr|upi\s*(?:ref|transaction)|paid\s*by|debited\s*from|credited\s*to|"
+    r"order\s*id|bank\s*reference|\d{1,2}:\d{2})",
+    re.I,
+)
+
+
 @dataclass
 class Narration:
     merchant: str
@@ -150,6 +162,31 @@ def parse_narration(text: str, statement_type: str = "bank") -> Narration:
     method = payment_method_for(raw)
     if statement_type == "credit_card":
         method = "Credit Card"
+    elif statement_type == "upi_app":
+        method = "UPI"
+
+    # UPI apps describe each payment in words: "Paid to Swiggy",
+    # "Received from Amit Kumar", "Bill paid - Airtel". The payee is the text
+    # after the verb, up to the detail fields printed after it.
+    if re.match(r"^cashback\b", raw, re.I):
+        return Narration(merchant="Cashback", payment_method=method)
+    if re.match(r"^(mobile\s+|dth\s+|fastag\s+)?recharg", raw, re.I):
+        kind = raw.split()[0].lower()
+        label = {"dth": "DTH recharge", "fastag": "FASTag recharge"}.get(kind, "Mobile recharge")
+        return Narration(merchant=label, payment_method="UPI" if statement_type == "upi_app" else method)
+    app_style = _APP_PHRASE.match(raw)
+    if app_style:
+        payee = _APP_DETAILS.split(app_style.group("payee"))[0]
+        payee = re.sub(r"\s+(xx|\*\*)\d{2,}.*$", "", payee, flags=re.I).strip(" -:,")
+        if sum(ch.isalpha() for ch in payee) >= 2:
+            if statement_type != "credit_card":
+                method = "UPI" if statement_type == "upi_app" or "upi" in raw.lower() else method
+            transfer = next((label for pattern, label, _ in TRANSFER_RULES if pattern.search(payee)), None)
+            return Narration(
+                merchant=_title(payee)[:80] if not transfer else transfer,
+                payment_method=method,
+                transfer_reason=transfer,
+            )
 
     for pattern, label, transfer_method in TRANSFER_RULES:
         if pattern.search(raw):

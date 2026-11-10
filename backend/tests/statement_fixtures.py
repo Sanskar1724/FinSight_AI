@@ -156,3 +156,78 @@ def scanned_style() -> bytes:
     buffer, pdf = _canvas()
     pdf.rect(40, 400, 200, 200, fill=1)
     return _finish(buffer, pdf)
+
+
+def _upi_rows(pdf: canvas.Canvas, y: float, rows, *, date_x=40, details_x=130, type_x=420, amount_x=560) -> None:
+    for when, time, details, extra, kind, amount in rows:
+        pdf.drawString(date_x, y, when)
+        pdf.drawString(details_x, y, details)
+        if kind:
+            pdf.drawString(type_x, y, kind)
+        pdf.drawRightString(amount_x, y, amount)
+        if time:
+            pdf.drawString(date_x, y - 10, time)
+        for offset, line in enumerate(extra, start=1):
+            pdf.drawString(details_x, y - 10 * offset, line)
+        y -= 14 + 10 * max(len(extra), 1 if time else 0)
+
+
+# The built-in PDF fonts have no rupee sign, so these use "Rs." and "INR";
+# parsing of "₹" itself is covered by a unit test.
+
+
+def phonepe_style() -> bytes:
+    """Month-first dates, a DEBIT/CREDIT word column and ₹ amounts with no
+    paise, with time, transaction ID, UTR and 'Paid by' lines under each row."""
+    buffer, pdf = _canvas()
+    width, height = A4
+    pdf.drawString(40, height - 40, "PhonePe")
+    pdf.drawString(40, height - 52, "Transaction Statement for 98XXXXX210")
+    pdf.drawString(40, height - 64, "Oct 01, 2026 - Oct 31, 2026")
+    y = height - 90
+    for x, label in [(40, "Date"), (130, "Transaction Details"), (420, "Type"), (520, "Amount")]:
+        pdf.drawString(x, y, label)
+    rows = [
+        ("Oct 01, 2026", "10:23 am", "Paid to Swiggy", ["Transaction ID T2610011023451234", "UTR No. 412345678901", "Paid by XXXXXX4821"], "DEBIT", "Rs.450"),
+        ("Oct 04, 2026", "08:02 pm", "Received from Amit Kumar", ["Transaction ID T2610042002111111", "Credited to XXXXXX4821"], "CREDIT", "Rs. 500"),
+        ("Oct 07, 2026", "09:15 am", "Mobile recharged 98XXXXX210", ["Transaction ID T2610070915222222"], "DEBIT", "INR 299"),
+        ("Oct 09, 2026", "01:40 pm", "Paid to Blinkit", ["Transaction ID T2610091340333333"], "DEBIT", "Rs.1,234.50"),
+    ]
+    _upi_rows(pdf, y - 16, rows)
+    return _finish(buffer, pdf)
+
+
+def gpay_style() -> bytes:
+    """Day-first dates with the time on the same line, and no type column:
+    the 'Paid to' / 'Received from' wording gives the direction."""
+    buffer, pdf = _canvas()
+    width, height = A4
+    pdf.drawString(40, height - 40, "Google Pay")
+    pdf.drawString(40, height - 52, "Transaction statement")
+    y = height - 80
+    for x, label in [(40, "Date & time"), (170, "Transaction details"), (520, "Amount")]:
+        pdf.drawString(x, y, label)
+    rows = [
+        ("02 Oct, 2026 07:45 PM", "", "Paid to Zomato", ["UPI Transaction ID: 427512345678", "Paid by HDFC Bank 4821"], "", "Rs.320"),
+        ("05 Oct, 2026 11:10 AM", "", "Received from Priya Sharma", ["UPI Transaction ID: 427598765432"], "", "Rs.1,000"),
+    ]
+    _upi_rows(pdf, y - 16, rows, details_x=170)
+    return _finish(buffer, pdf)
+
+
+def navi_style() -> bytes:
+    """Signed amounts ('- ₹450', '+ ₹50') and a date with a trailing comma
+    and time."""
+    buffer, pdf = _canvas()
+    width, height = A4
+    pdf.drawString(40, height - 40, "Navi UPI")
+    pdf.drawString(40, height - 52, "Account statement")
+    y = height - 80
+    for x, label in [(40, "Date"), (170, "Details"), (520, "Amount")]:
+        pdf.drawString(x, y, label)
+    rows = [
+        ("03 Oct 2026, 09:30 AM", "", "Paid to Uber India", ["UTR 412300000001"], "", "- Rs.212"),
+        ("06 Oct 2026, 06:00 PM", "", "Cashback received", ["UTR 412300000002"], "", "+ Rs.50"),
+    ]
+    _upi_rows(pdf, y - 16, rows, details_x=170)
+    return _finish(buffer, pdf)

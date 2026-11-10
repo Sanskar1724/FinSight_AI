@@ -223,3 +223,94 @@ def test_import_validates_category_kind_and_account_owner(client: TestClient) ->
 
 def test_statement_endpoints_require_login(client: TestClient) -> None:
     assert _preview(client, fixtures.hdfc_style()).status_code == 401
+
+
+# ---------- UPI app statements ----------
+
+def test_rupee_sign_amounts_without_paise() -> None:
+    from decimal import Decimal
+
+    from app.services.statement_pdf import parse_money
+
+    assert parse_money("₹450") == (Decimal("450"), None)
+    assert parse_money("₹1,23,456.5") == (Decimal("123456.5"), None)
+    assert parse_money("+₹50") == (Decimal("50"), "cr")
+    assert parse_money("-Rs.212") == (Decimal("212"), "dr")
+    assert parse_money("INR 299") == (Decimal("299"), None)
+    # A bare whole number is a reference, not money.
+    assert parse_money("412345678901") is None
+
+
+def test_phonepe_style_statement() -> None:
+    parsed = read_statement(fixtures.phonepe_style())
+    assert parsed.statement_type == "upi_app"
+    assert parsed.bank == "PhonePe"
+    assert [(r.occurred_on.day, r.type, str(r.amount)) for r in parsed.rows] == [
+        (1, "expense", "450"),
+        (4, "income", "500"),
+        (7, "expense", "299"),
+        (9, "expense", "1234.50"),
+    ]
+    # Transaction ID, UTR and "Paid by" lines are not part of the payee.
+    assert parsed.rows[0].description == "Paid to Swiggy"
+    merchants = [parse_narration(r.description, "upi_app").merchant for r in parsed.rows]
+    assert merchants == ["Swiggy", "Amit Kumar", "Mobile recharge", "Blinkit"]
+    assert parse_narration("Paid to Swiggy", "upi_app").payment_method == "UPI"
+
+
+def test_google_pay_and_navi_style_statements() -> None:
+    gpay = read_statement(fixtures.gpay_style())
+    assert gpay.bank == "Google Pay"
+    assert [(r.occurred_on.day, r.type, str(r.amount)) for r in gpay.rows] == [
+        (2, "expense", "320"),
+        (5, "income", "1000"),
+    ]
+    navi = read_statement(fixtures.navi_style())
+    assert navi.bank == "Navi"
+    assert [(r.type, str(r.amount)) for r in navi.rows] == [("expense", "212"), ("income", "50")]
+    assert parse_narration(navi.rows[1].description, "upi_app").merchant == "Cashback"
+
+
+def test_upi_app_payment_already_imported_from_bank_is_flagged(client: TestClient) -> None:
+    signup(client)
+    bank_preview = _preview(client, fixtures.hdfc_style()).json()
+    rows = [
+        {
+            "occurred_on": row["occurred_on"],
+            "type": row["type"],
+            "amount": f"{row['amount']:.2f}",
+            "merchant": row["merchant"],
+            "category_id": row["category_id"],
+            "payment_method": row["payment_method"],
+        }
+        for row in bank_preview["rows"]
+        if row["include"]
+    ]
+    assert client.post("/api/statements/import", json={"rows": rows}).json()["imported"] == 5
+
+    upi = _preview(client, fixtures.phonepe_style()).json()
+    assert upi["statement_type"] == "upi_app"
+    by_merchant = {row["merchant"]: row for row in upi["rows"]}
+    # Same ₹450 on 1 Oct came in from the bank statement as "Swiggy".
+    swiggy = by_merchant["Swiggy"]
+    assert swiggy["duplicate"] and not swiggy["include"]
+    assert "already in your ledger" in swiggy["note"].lower()
+    # A different amount on a different day is new.
+    assert by_merchant["Blinkit"]["include"]
+    assert _slug_of(client, by_merchant["Blinkit"]["category_id"]) == "groceries"
+    assert _slug_of(client, by_merchant["Mobile recharge"]["category_id"]) == "utilities"
+
+
+def test_upi_app_payment_with_other_name_in_ledger_is_flagged(client: TestClient) -> None:
+    signup(client)
+    # The bank statement named the payee differently, e.g. a gateway name.
+    first = _preview(client, fixtures.gpay_style()).json()["rows"][0]
+    row = {"occurred_on": "2026-10-02", "type": "expense", "amount": "320.00", "merchant": "Zomato Media Pvt", "category_id": first["category_id"], "payment_method": "UPI"}
+    assert client.post("/api/statements/import", json={"rows": [row]}).json()["imported"] == 1
+
+    upi = _preview(client, fixtures.gpay_style()).json()
+    by_merchant = {item["merchant"]: item for item in upi["rows"]}
+    zomato = by_merchant["Zomato"]
+    assert zomato["duplicate"] and not zomato["include"]
+    assert "Probably already in your ledger as 'Zomato Media Pvt'" in zomato["note"]
+    assert by_merchant["Priya Sharma"]["include"]

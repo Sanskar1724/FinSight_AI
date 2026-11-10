@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import date, timedelta
 from decimal import Decimal
 
 from sqlalchemy import select
@@ -33,6 +34,38 @@ def _history_categories(db: Session, user_id: int) -> dict[tuple[str, str], int]
     return {(merchant.strip().lower(), txn_type): category_id for merchant, txn_type, category_id in rows}
 
 
+def _ledger_amounts(
+    db: Session, user_id: int, rows: list, statement_type: str
+) -> dict[tuple[date, str, Decimal], str]:
+    """Existing transactions keyed by date, direction and amount, for the
+    statement's date range (plus a day either side)."""
+    if not rows:
+        return {}
+    start = min(row.occurred_on for row in rows) - timedelta(days=1)
+    end = max(row.occurred_on for row in rows) + timedelta(days=1)
+    found: dict[tuple[date, str, Decimal], str] = {}
+    for occurred_on, txn_type, amount, merchant in db.execute(
+        select(Transaction.occurred_on, Transaction.type, Transaction.amount, Transaction.merchant).where(
+            Transaction.user_id == user_id, Transaction.occurred_on.between(start, end)
+        )
+    ).all():
+        found.setdefault((occurred_on, txn_type, q(Decimal(str(amount)))), merchant)
+    return found
+
+
+def _same_payment(
+    existing: dict[tuple[date, str, Decimal], str], occurred_on: date, txn_type: str, amount: Decimal
+) -> str | None:
+    """The merchant of a ledger entry that is probably this same payment: same
+    direction and amount within a day. Banks and UPI apps name the payee
+    differently, so the merchant is not compared."""
+    for offset in (0, -1, 1):
+        merchant = existing.get((occurred_on + timedelta(days=offset), txn_type, q(amount)))
+        if merchant:
+            return merchant
+    return None
+
+
 def _suggest_account(db: Session, user: User, parsed: ParsedStatement) -> int | None:
     accounts = db.scalars(
         select(Account).where(Account.user_id == user.id, Account.is_archived.is_(False))
@@ -60,6 +93,7 @@ def build_preview(db: Session, user: User, parsed: ParsedStatement) -> Statement
     history = _history_categories(db, user.id)
     signatures = existing_signatures(db, user.id)
     seen: set[tuple[str, str, str, str]] = set()
+    ledger = _ledger_amounts(db, user.id, parsed.rows, parsed.statement_type)
 
     rows: list[StatementPreviewRow] = []
     for index, raw in enumerate(parsed.rows, start=1):
@@ -75,6 +109,7 @@ def build_preview(db: Session, user: User, parsed: ParsedStatement) -> Statement
         is_transfer = narration.transfer_reason is not None
         signature = transaction_signature(raw.occurred_on, txn_type, raw.amount, narration.merchant)
         duplicate = signature in signatures or signature in seen
+        likely_same = None if duplicate else _same_payment(ledger, raw.occurred_on, txn_type, raw.amount)
         seen.add(signature)
         note = None
         if is_transfer:
@@ -84,6 +119,12 @@ def build_preview(db: Session, user: User, parsed: ParsedStatement) -> Statement
             )
         elif duplicate:
             note = "Already in your ledger (same date, amount, direction and merchant)."
+        elif likely_same:
+            duplicate = True
+            note = (
+                f"Probably already in your ledger as '{likely_same}' (same amount within a day), for example "
+                "from your bank statement. Skipped by default; tick it if it is a separate payment."
+            )
         rows.append(
             StatementPreviewRow(
                 row_number=index,

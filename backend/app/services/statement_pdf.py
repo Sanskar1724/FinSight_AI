@@ -42,11 +42,38 @@ _DATE_ONE_TOKEN = re.compile(
     rf"^(\d{{1,2}}[/\-.](\d{{1,2}}|{_MONTHS})[/\-.](\d{{2}}|\d{{4}})|\d{{4}}-\d{{2}}-\d{{2}})$",
     re.I,
 )
-_DAY = re.compile(r"^\d{1,2}$")
+_DAY = re.compile(r"^\d{1,2},?$")
 _MONTH = re.compile(rf"^({_MONTHS})[a-z]*,?$", re.I)
-_YEAR = re.compile(r"^(\d{2}|\d{4})$")
+_YEAR = re.compile(r"^(\d{2}|\d{4}),?$")
 _MONEY = re.compile(r"^\(?-?(?:\d{1,3}(?:,\d{2,3})+|\d+)\.\d{2}\)?(cr|dr)?$", re.I)
 _MARKER = re.compile(r"^(cr|dr)\.?$", re.I)
+# UPI apps print the direction as a word next to the amount.
+_TYPE_WORD = re.compile(r"^(debit|credit|debited|credited|paid|received)$", re.I)
+# Amounts with a currency sign may omit the paise: "₹450", "Rs.1,200", "+ ₹50".
+_CURRENCY_MONEY = re.compile(
+    r"^(?P<sign>[+\-])?(?:₹|rs\.?|inr)\s?(?P<num>(?:\d{1,3}(?:,\d{2,3})+|\d+)(?:\.\d{1,2})?)(?P<marker>cr|dr)?$",
+    re.I,
+)
+_CURRENCY_ONLY = re.compile(r"^[+\-]?(₹|rs\.?|inr)$", re.I)
+_TIME = re.compile(r"^\d{1,2}:\d{2}(:\d{2})?$|^(am|pm)$", re.I)
+# Detail lines UPI apps print under each payment; never part of the payee.
+_UPI_META = re.compile(
+    r"^(\d{1,2}:\d{2}|transaction\s*id|txn\s*id|utr|upi\s*(ref|transaction)|paid\s*by|debited\s*from|"
+    r"credited\s*to|bank\s*reference|order\s*id)",
+    re.I,
+)
+UPI_APPS = [
+    (re.compile(r"phonepe", re.I), "PhonePe"),
+    (re.compile(r"google\s*pay|\bgpay\b", re.I), "Google Pay"),
+    (re.compile(r"paytm", re.I), "Paytm"),
+    (re.compile(r"amazon\s*pay", re.I), "Amazon Pay"),
+    (re.compile(r"\bbhim\b", re.I), "BHIM"),
+    (re.compile(r"\bcred\b", re.I), "CRED"),
+    (re.compile(r"\bnavi\b", re.I), "Navi"),
+    (re.compile(r"mobikwik", re.I), "MobiKwik"),
+    (re.compile(r"super\.?money", re.I), "super.money"),
+    (re.compile(r"freecharge", re.I), "Freecharge"),
+]
 
 DEBIT_HEADERS = ("withdrawal", "withdrawals", "debit", "debits", "dr", "paid", "withdrawal(dr)")
 CREDIT_HEADERS = ("deposit", "deposits", "credit", "credits", "cr", "received", "deposit(cr)")
@@ -142,7 +169,20 @@ class ParsedStatement:
 # ---------- helpers ----------
 
 def parse_money(text: str) -> tuple[Decimal, str | None] | None:
-    token = text.strip().replace("₹", "")
+    raw = text.strip()
+    currency = _CURRENCY_MONEY.match(raw.replace(" ", ""))
+    if currency:
+        try:
+            value = Decimal(currency.group("num").replace(",", ""))
+        except InvalidOperation:
+            return None
+        marker = (currency.group("marker") or "").lower() or None
+        if currency.group("sign") == "+":
+            marker = marker or "cr"
+        elif currency.group("sign") == "-":
+            marker = marker or "dr"
+        return value, marker
+    token = raw.replace("₹", "")
     match = _MONEY.match(token)
     if not match:
         return None
@@ -187,7 +227,12 @@ def _leading_date(words: list[_Word]) -> tuple[date, int] | None:
         if parsed:
             return parsed, 1
     if len(words) >= 3 and _DAY.match(first) and _MONTH.match(words[1].text) and _YEAR.match(words[2].text):
-        parsed = _parse_date_text(f"{first} {words[1].text.rstrip(',')[:3]} {words[2].text}")
+        parsed = _parse_date_text(f"{first.rstrip(',')} {words[1].text.rstrip(',')[:3]} {words[2].text.rstrip(',')}")
+        if parsed:
+            return parsed, 3
+    # Month first, as UPI apps print it: "Oct 01, 2026".
+    if len(words) >= 3 and _MONTH.match(first) and _DAY.match(words[1].text) and _YEAR.match(words[2].text):
+        parsed = _parse_date_text(f"{words[1].text.rstrip(',')} {first.rstrip(',')[:3]} {words[2].text.rstrip(',')}")
         if parsed:
             return parsed, 3
     return None
@@ -250,17 +295,46 @@ def _header_columns(line: _Line) -> _Columns | None:
     return columns if columns.usable else None
 
 
-def _amount_tokens(words: list[_Word]) -> list[tuple[_Word, Decimal, str | None]]:
-    found: list[tuple[_Word, Decimal, str | None]] = []
-    for index, word in enumerate(words):
+def _money_spans(words: list[_Word]) -> list[tuple[_Word, Decimal, str | None, set[int]]]:
+    """Find amounts in a line. Each result has the word that marks its
+    position, the value, a direction marker ("cr"/"dr") if one is printed
+    next to it, and the ids of every word it used."""
+    found: list[tuple[_Word, Decimal, str | None, set[int]]] = []
+    index = 0
+    while index < len(words):
+        word = words[index]
+        used = {id(word)}
         parsed = parse_money(word.text)
+        if parsed is None and _CURRENCY_ONLY.match(word.text) and index + 1 < len(words):
+            parsed = parse_money(word.text + words[index + 1].text)
+            if parsed is not None:
+                index += 1
+                word = words[index]
+                used.add(id(word))
         if parsed is None:
+            index += 1
             continue
         value, marker = parsed
+        start = index - (len(used) - 1)
+        if marker is None and start > 0 and words[start - 1].text in {"+", "-", "−"}:
+            marker = "cr" if words[start - 1].text == "+" else "dr"
+            used.add(id(words[start - 1]))
         if marker is None and index + 1 < len(words) and _MARKER.match(words[index + 1].text):
-            marker = words[index + 1].text.lower().rstrip(".")
-        found.append((word, value, marker))
+            marker = words[index + 1].text.lower().rstrip(".")[:2]
+            used.add(id(words[index + 1]))
+        before = index - len(used) if len(used) > 1 else index - 1
+        for neighbour in (index + 1, before):
+            if marker is None and 0 <= neighbour < len(words) and _TYPE_WORD.match(words[neighbour].text):
+                text = words[neighbour].text.lower()
+                marker = "cr" if text in {"credit", "credited", "received"} else "dr"
+                used.add(id(words[neighbour]))
+        found.append((word, value, marker, used))
+        index += 1
     return found
+
+
+def _amount_tokens(words: list[_Word]) -> list[tuple[_Word, Decimal, str | None]]:
+    return [(word, value, marker) for word, value, marker, _ in _money_spans(words)]
 
 
 def _nearest(centre: float, options: dict[str, float | None]) -> str | None:
@@ -279,6 +353,15 @@ def _detect_bank(text: str) -> str | None:
     # that mentions another bank (for example "SBI ATM" on an HDFC statement).
     best: tuple[int, str] | None = None
     for pattern, name in BANKS:
+        match = pattern.search(text)
+        if match and (best is None or match.start() < best[0]):
+            best = (match.start(), name)
+    return best[1] if best else None
+
+
+def _detect_upi_app(text: str) -> str | None:
+    best: tuple[int, str] | None = None
+    for pattern, name in UPI_APPS:
         match = pattern.search(text)
         if match and (best is None or match.start() < best[0]):
             best = (match.start(), name)
@@ -308,6 +391,10 @@ def _summary_balance(lines: list[_Line], label: str) -> Decimal | None:
 
 def _direction_hint(description: str) -> str | None:
     lowered = description.lower()
+    if re.search(r"^(paid\s+to|sent\s+to|money\s+sent|payment\s+to|bill\s+paid|recharge)", lowered):
+        return "expense"
+    if re.search(r"^(received\s+from|money\s+received|cashback|refund)", lowered):
+        return "income"
     if re.search(r"(/cr/|\bcr\b|credited|by transfer|\bdeposit|salary|refund|reversal|cashback|interest|int\.pd)", lowered):
         return "income"
     if re.search(r"(/dr/|\bdr\b|debited|to transfer|withdrawal|\bpos\b|\batm\b|purchase)", lowered):
@@ -369,12 +456,15 @@ def read_statement(content: bytes, password: str | None = None) -> ParsedStateme
             "no_text",
         )
     lowered_text = full_text.lower()
-    statement_type = (
-        "credit_card"
-        if "credit card" in lowered_text
-        and re.search(r"(minimum\s+amount\s+due|total\s+amount\s+due|payment\s+due\s+date)", lowered_text)
-        else "bank"
-    )
+    upi_app = _detect_upi_app(full_text[:3000])
+    if "credit card" in lowered_text and re.search(
+        r"(minimum\s+amount\s+due|total\s+amount\s+due|payment\s+due\s+date)", lowered_text
+    ):
+        statement_type = "credit_card"
+    elif upi_app and not re.search(r"(withdrawal|deposit)", lowered_text[:3000]):
+        statement_type = "upi_app"
+    else:
+        statement_type = "bank"
 
     columns: _Columns | None = None
     rows: list[RawRow] = []
@@ -396,12 +486,12 @@ def read_statement(content: bytes, password: str | None = None) -> ParsedStateme
             second = _leading_date(rest)
             if second:
                 rest = rest[second[1]:]
+            # A time printed after the date ("10:23 AM") is not narration.
+            while rest and _TIME.match(rest[0].text):
+                rest = rest[1:]
             skip: set[int] = set()
-            for index, word in enumerate(rest):
-                if parse_money(word.text) is not None:
-                    skip.add(id(word))
-                    if index + 1 < len(rest) and _MARKER.match(rest[index + 1].text):
-                        skip.add(id(rest[index + 1]))
+            for _, _, _, used_ids in _money_spans(rest):
+                skip |= used_ids
             description_words = [w for w in rest if id(w) not in skip]
             description = " ".join(w.text for w in description_words).strip()
             if any(stop in lowered for stop in ("opening balance", "closing balance", "brought forward", "b/f")) and not description.strip("-"):
@@ -427,6 +517,7 @@ def read_statement(content: bytes, password: str | None = None) -> ParsedStateme
             and not amounts
             and continuation < 3
             and not any(stop in lowered for stop in STOP_WORDS)
+            and not _UPI_META.match(line.text.strip())
             and abs(line.words[0].top - last_row_line.words[0].top) < 40 * (continuation + 1)
         ):
             rows[-1].description = f"{rows[-1].description} {line.text}".strip()
@@ -450,7 +541,7 @@ def read_statement(content: bytes, password: str | None = None) -> ParsedStateme
     return ParsedStatement(
         rows=rows,
         statement_type=statement_type,
-        bank=_detect_bank(full_text[:6000]),
+        bank=upi_app if statement_type == "upi_app" else _detect_bank(full_text[:6000]),
         account_last4=last4,
         opening_balance=opening,
         closing_balance=closing,
@@ -491,8 +582,15 @@ def _row_from_amounts(
                 amount, txn_type = value, "expense" if slot == "debit" else "income"
             elif slot == "amount" and value > 0 and amount is None:
                 amount = value
-                txn_type = "income" if marker == "cr" else "expense"
-                source = "marker" if marker else "column"
+                if marker:
+                    txn_type = "income" if marker == "cr" else "expense"
+                    source = "marker"
+                else:
+                    # One amount column with no Cr/Dr: the wording decides
+                    # ("Received from", "Refund"), otherwise it is spending.
+                    hint = _direction_hint(description)
+                    txn_type = hint or "expense"
+                    source = "narration" if hint else "column"
     if amount is None:
         source = "balance"
         values = [(value, marker) for _, value, marker in amounts]

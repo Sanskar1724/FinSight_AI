@@ -636,7 +636,7 @@ export interface StatementPreviewRow {
 }
 
 export interface StatementPreview {
-  statement_type: "bank" | "credit_card";
+  statement_type: "bank" | "credit_card" | "upi_app";
   bank: string | null;
   account_last4: string | null;
   suggested_account_id: number | null;
