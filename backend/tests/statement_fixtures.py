@@ -231,3 +231,41 @@ def navi_style() -> bytes:
     ]
     _upi_rows(pdf, y - 16, rows, details_x=170)
     return _finish(buffer, pdf)
+
+
+def navi_app_style() -> bytes:
+    """Navi's own export: every character drawn twice (fake bold), an
+    Account column between the payee and the amount, and time, UPI ID and
+    note lines under each row."""
+    buffer, pdf = _canvas()
+    width, height = A4
+
+    def bold(x: float, y: float, text: str, right: bool = False) -> None:
+        draw = pdf.drawRightString if right else pdf.drawString
+        draw(x, y, text)
+        draw(x + 0.4, y, text)
+
+    bold(40, height - 40, "Ravi Kumar Test")
+    bold(40, height - 52, "Transaction statement from 10 Oct 2026 to 10 Nov 2026")
+    bold(40, height - 64, "All UPI, bill payments & recharges done via Navi are listed in this statement")
+    y = height - 90
+    for x, label in [(40, "Date"), (120, "Transaction details"), (330, "Account"), (520, "Amount")]:
+        bold(x, y, label)
+    rows = [
+        ("10 Nov 2026", "Paid to MANSI CHICKEN CENTRE", "Rs.80", "Maharashtra", "Gramin Bank - 7126", "1:39 PM"),
+        ("10 Nov 2026", "Paid to MANSI CHICKEN CENTRE", "Rs.80", "Maharashtra", "Gramin Bank - 7126", "9:12 AM"),
+        ("8 Nov 2026", "Paid to BOOKMYSHOW", "Rs.313.04", "State Bank of", "India - 5273", "9:05 PM"),
+        ("3 Nov 2026", "Received from RAHUL TEST KUMAR", "Rs.30", "Maharashtra", "Gramin Bank - 7126", "7:50 PM"),
+    ]
+    y -= 18
+    for when, details, amount, bank_one, bank_two, time in rows:
+        bold(40, y, when)
+        bold(120, y, details)
+        bold(560, y, amount, right=True)
+        bold(330, y - 11, bank_one)
+        bold(40, y - 22, time)
+        bold(120, y - 22, "UPI txn ID: 631462949946")
+        bold(330, y - 22, bank_two)
+        bold(120, y - 33, "Note: Paid via Navi UPI")
+        y -= 50
+    return _finish(buffer, pdf)

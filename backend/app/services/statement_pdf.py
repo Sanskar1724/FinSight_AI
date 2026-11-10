@@ -59,7 +59,7 @@ _TIME = re.compile(r"^\d{1,2}:\d{2}(:\d{2})?$|^(am|pm)$", re.I)
 # Detail lines UPI apps print under each payment; never part of the payee.
 _UPI_META = re.compile(
     r"^(\d{1,2}:\d{2}|transaction\s*id|txn\s*id|utr|upi\s*(ref|transaction)|paid\s*by|debited\s*from|"
-    r"credited\s*to|bank\s*reference|order\s*id)",
+    r"credited\s*to|bank\s*reference|order\s*id|note\s*:)",
     re.I,
 )
 UPI_APPS = [
@@ -267,6 +267,9 @@ class _Columns:
     credit: float | None = None
     balance: float | None = None
     amount: float | None = None
+    # Left edge of an "Account" column that UPI apps print between the
+    # payee and the amount (the bank account the money came from).
+    account: float | None = None
 
     @property
     def usable(self) -> bool:
@@ -292,7 +295,18 @@ def _header_columns(line: _Line) -> _Columns | None:
             columns.balance = word.centre
         elif columns.amount is None and token in AMOUNT_HEADERS:
             columns.amount = word.centre
+        elif columns.account is None and token == "account":
+            columns.account = word.x0
     return columns if columns.usable else None
+
+
+def _in_account_column(word: _Word, columns: _Columns | None, statement_type: str) -> bool:
+    return (
+        statement_type == "upi_app"
+        and columns is not None
+        and columns.account is not None
+        and word.x0 >= columns.account - 2
+    )
 
 
 def _money_spans(words: list[_Word]) -> list[tuple[_Word, Decimal, str | None, set[int]]]:
@@ -441,6 +455,8 @@ def read_statement(content: bytes, password: str | None = None) -> ParsedStateme
         lines: list[_Line] = []
         full_text_parts: list[str] = []
         for number, page in enumerate(pdf.pages[:MAX_PAGES], start=1):
+            # Some apps print every character twice to fake bold text.
+            page = page.dedupe_chars(tolerance=1)
             words = page.extract_words(x_tolerance=1.5, y_tolerance=3, keep_blank_chars=False)
             page_lines = _group_lines(words, number)
             lines.extend(page_lines)
@@ -492,7 +508,7 @@ def read_statement(content: bytes, password: str | None = None) -> ParsedStateme
             skip: set[int] = set()
             for _, _, _, used_ids in _money_spans(rest):
                 skip |= used_ids
-            description_words = [w for w in rest if id(w) not in skip]
+            description_words = [w for w in rest if id(w) not in skip and not _in_account_column(w, columns, statement_type)]
             description = " ".join(w.text for w in description_words).strip()
             if any(stop in lowered for stop in ("opening balance", "closing balance", "brought forward", "b/f")) and not description.strip("-"):
                 continue
@@ -520,7 +536,9 @@ def read_statement(content: bytes, password: str | None = None) -> ParsedStateme
             and not _UPI_META.match(line.text.strip())
             and abs(line.words[0].top - last_row_line.words[0].top) < 40 * (continuation + 1)
         ):
-            rows[-1].description = f"{rows[-1].description} {line.text}".strip()
+            extra = " ".join(w.text for w in line.words if not _in_account_column(w, columns, statement_type))
+            if extra:
+                rows[-1].description = f"{rows[-1].description} {extra}".strip()
             continuation += 1
         else:
             last_row_line = None if dated or amounts else last_row_line

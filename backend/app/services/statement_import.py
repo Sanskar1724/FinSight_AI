@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections import Counter
 from datetime import date, timedelta
 from decimal import Decimal
 
@@ -16,7 +17,7 @@ from app.schemas import (
     StatementPreviewResponse,
     StatementPreviewRow,
 )
-from app.services.csv_import import existing_signatures, transaction_signature
+from app.services.csv_import import transaction_signature
 from app.services.finance import q
 from app.services.narration import category_slug_for, parse_narration
 from app.services.statement_pdf import ParsedStatement
@@ -91,8 +92,8 @@ def build_preview(db: Session, user: User, parsed: ParsedStatement) -> Statement
     by_slug = {category.slug: category for category in categories}
     by_id = {category.id: category for category in categories}
     history = _history_categories(db, user.id)
-    signatures = existing_signatures(db, user.id)
-    seen: set[tuple[str, str, str, str]] = set()
+    signatures = _signature_counts(db, user.id)
+    seen: Counter[tuple[str, str, str, str]] = Counter()
     ledger = _ledger_amounts(db, user.id, parsed.rows, parsed.statement_type)
 
     rows: list[StatementPreviewRow] = []
@@ -108,9 +109,12 @@ def build_preview(db: Session, user: User, parsed: ParsedStatement) -> Statement
             category_id = category.id
         is_transfer = narration.transfer_reason is not None
         signature = transaction_signature(raw.occurred_on, txn_type, raw.amount, narration.merchant)
-        duplicate = signature in signatures or signature in seen
+        # Two equal payments on one day (two teas at the same stall) are both
+        # real when the statement lists them twice. The nth copy is only a
+        # duplicate when the ledger already holds n of them.
+        seen[signature] += 1
+        duplicate = seen[signature] <= signatures[signature]
         likely_same = None if duplicate else _same_payment(ledger, raw.occurred_on, txn_type, raw.amount)
-        seen.add(signature)
         note = None
         if is_transfer:
             note = (
@@ -171,9 +175,21 @@ def build_preview(db: Session, user: User, parsed: ParsedStatement) -> Statement
     )
 
 
+def _signature_counts(db: Session, user_id: int) -> Counter[tuple[str, str, str, str]]:
+    rows = db.execute(
+        select(Transaction.occurred_on, Transaction.type, Transaction.amount, Transaction.merchant).where(
+            Transaction.user_id == user_id
+        )
+    ).all()
+    return Counter(
+        transaction_signature(row.occurred_on, row.type, Decimal(str(row.amount)), row.merchant) for row in rows
+    )
+
+
 def import_statement_rows(db: Session, user: User, payload: StatementImportRequest) -> StatementImportResponse:
     categories = {category.id: category for category in db.scalars(select(Category)).all()}
-    signatures = existing_signatures(db, user.id)
+    signatures = _signature_counts(db, user.id)
+    seen: Counter[tuple[str, str, str, str]] = Counter()
     imported = 0
     skipped = 0
     errors: list[str] = []
@@ -190,10 +206,10 @@ def import_statement_rows(db: Session, user: User, payload: StatementImportReque
             errors.append(f"Row {index}: merchant is required")
             continue
         signature = transaction_signature(row.occurred_on, row.type, row.amount, merchant)
-        if signature in signatures:
+        seen[signature] += 1
+        if seen[signature] <= signatures[signature]:
             skipped += 1
             continue
-        signatures.add(signature)
         note = f"From statement: {row.description.strip()}"[:2000] if row.description else None
         db.add(
             Transaction(

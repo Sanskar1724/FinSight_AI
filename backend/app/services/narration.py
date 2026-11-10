@@ -62,11 +62,15 @@ TRANSFER_RULES: list[tuple[re.Pattern[str], str, str]] = [
 # (keywords, category slug). Checked against the merchant and narration, in order.
 EXPENSE_RULES: list[tuple[tuple[str, ...], str]] = [
     (("swiggy", "zomato", "dominos", "domino's", "pizza", "mcdonald", "kfc", "burger", "cafe", "coffee",
-      "starbucks", "chai", "restaurant", "hotel saravana", "haldiram", "eatsure", "biryani", "bakery"), "food-dining"),
+      "starbucks", "chai", "restaurant", "hotel saravana", "haldiram", "eatsure", "biryani", "bakery",
+      "pizzaa", "eatclub", "chicken", "ice cream", "icecream", "sweet", "sweets", "nasta", "dhaba", "mess", "canteen",
+      "juice", "snacks", "food", "vada pav", "misal", "tea stall"), "food-dining"),
     (("bigbasket", "blinkit", "zepto", "instamart", "dmart", "d mart", "jiomart", "grofers", "reliance fresh",
-      "more retail", "spencer", "nature's basket", "kirana", "grocery", "supermarket", "milkbasket", "country delight"), "groceries"),
+      "more retail", "spencer", "nature's basket", "kirana", "grocery", "supermarket", "milkbasket", "country delight",
+      "super market", "dairy", "general store", "provision", "kirana store", "vegetable", "fruits"), "groceries"),
     (("uber", "ola", "rapido", "irctc", "metro", "redbus", "fastag", "petrol", "diesel", "fuel", "hpcl",
-      "bpcl", "indian oil", "iocl", "shell", "parking", "namma yatri", "blusmart"), "transport"),
+      "bpcl", "indian oil", "iocl", "shell", "parking", "namma yatri", "blusmart",
+      "pmpml", "bmtc", "best bus", "ksrtc", "msrtc"), "transport"),
     (("netflix", "spotify", "hotstar", "disney", "prime video", "amazon prime", "youtube premium", "jiocinema",
       "sonyliv", "zee5", "apple.com", "google play", "icloud", "chatgpt", "openai", "notion", "subscription"), "subscriptions"),
     (("airtel", "jio", "vodafone", "vi prepaid", "bsnl", "electricity", "bescom", "msedcl", "tata power",
@@ -77,7 +81,7 @@ EXPENSE_RULES: list[tuple[tuple[str, ...], str]] = [
     (("makemytrip", "goibibo", "cleartrip", "yatra", "indigo", "air india", "vistara", "spicejet", "akasa",
       "oyo", "airbnb", "booking.com", "agoda", "ixigo"), "travel"),
     (("udemy", "coursera", "byju", "unacademy", "college", "school", "university", "tuition", "exam fee",
-      "fees", "vedantu", "physics wallah", "books"), "education"),
+      "fees", "vedantu", "physics wallah", "books", "xerox", "stationery"), "education"),
     (("rent", "nobroker", "housing.com", "landlord", "pg ", "hostel"), "rent"),
     (("amazon", "flipkart", "myntra", "ajio", "meesho", "nykaa", "tatacliq", "croma", "reliance digital",
       "decathlon", "ikea", "lifestyle", "shoppers stop", "westside", "zara", "h&m", "lenskart", "purplle"), "shopping"),
@@ -178,6 +182,7 @@ def parse_narration(text: str, statement_type: str = "bank") -> Narration:
     if app_style:
         payee = _APP_DETAILS.split(app_style.group("payee"))[0]
         payee = re.sub(r"\s+(xx|\*\*)\d{2,}.*$", "", payee, flags=re.I).strip(" -:,")
+        payee = re.sub(r"\s+upi$", "", payee, flags=re.I)
         if sum(ch.isalpha() for ch in payee) >= 2:
             if statement_type != "credit_card":
                 method = "UPI" if statement_type == "upi_app" or "upi" in raw.lower() else method

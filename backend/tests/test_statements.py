@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date
+from decimal import Decimal
 
 from fastapi.testclient import TestClient
 
@@ -314,3 +315,37 @@ def test_upi_app_payment_with_other_name_in_ledger_is_flagged(client: TestClient
     assert zomato["duplicate"] and not zomato["include"]
     assert "Probably already in your ledger as 'Zomato Media Pvt'" in zomato["note"]
     assert by_merchant["Priya Sharma"]["include"]
+
+
+def test_navi_app_export_with_doubled_text_and_account_column() -> None:
+    parsed = read_statement(fixtures.navi_app_style(), None)
+    assert parsed.statement_type == "upi_app"
+    assert parsed.bank == "Navi"
+    got = [(row.occurred_on.isoformat(), row.type, row.amount) for row in parsed.rows]
+    assert got == [
+        ("2026-11-10", "expense", Decimal("80")),
+        ("2026-11-10", "expense", Decimal("80")),
+        ("2026-11-08", "expense", Decimal("313.04")),
+        ("2026-11-03", "income", Decimal("30")),
+    ]
+    merchants = [parse_narration(row.description, "upi_app").merchant for row in parsed.rows]
+    # The bank in the Account column and the note are not part of the payee.
+    assert merchants == ["Mansi Chicken Centre", "Mansi Chicken Centre", "Bookmyshow", "Rahul Test Kumar"]
+    assert category_slug_for(merchants[0], "expense") == "food-dining"
+
+
+def test_two_equal_payments_on_one_day_are_both_kept(client: TestClient) -> None:
+    signup(client)
+    preview = _preview(client, fixtures.navi_app_style()).json()
+    chicken = [row for row in preview["rows"] if row["merchant"] == "Mansi Chicken Centre"]
+    assert len(chicken) == 2 and all(row["include"] and not row["duplicate"] for row in chicken)
+    rows = [
+        {key: row[key] for key in ("occurred_on", "type", "merchant", "category_id", "payment_method")}
+        | {"amount": f"{row['amount']:.2f}"}
+        for row in preview["rows"]
+        if row["include"]
+    ]
+    assert client.post("/api/statements/import", json={"rows": rows}).json()["imported"] == 4
+    # Importing the same file again finds both copies already saved.
+    again = _preview(client, fixtures.navi_app_style()).json()
+    assert all(row["duplicate"] and not row["include"] for row in again["rows"])
