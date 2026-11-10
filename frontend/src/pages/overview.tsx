@@ -242,6 +242,9 @@ export default function OverviewPage() {
               <Button variant="outline" asChild>
                 <Link to="/app/transactions?import=1">Import CSV</Link>
               </Button>
+              <Button variant="outline" asChild>
+                <Link to="/app/transactions?statement=1">Import bank statement</Link>
+              </Button>
             </div>
           </div>
         </Card>

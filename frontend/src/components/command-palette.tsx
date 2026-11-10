@@ -31,7 +31,8 @@ interface Command {
 
 const actions: Command[] = [
   { id: "new-txn", group: "Actions", label: "Add a transaction", icon: Plus, to: "/app/transactions?new=1", keywords: "expense income record spend" },
-  { id: "import", group: "Actions", label: "Import a CSV", icon: FileUp, to: "/app/transactions?import=1", keywords: "upload bank statement" },
+  { id: "statement", group: "Actions", label: "Import a bank statement PDF", icon: FileUp, to: "/app/transactions?statement=1", keywords: "upload bank statement pdf credit card sbi hdfc icici axis kotak" },
+  { id: "import", group: "Actions", label: "Import a CSV", icon: FileUp, to: "/app/transactions?import=1", keywords: "upload spreadsheet" },
   { id: "new-budget", group: "Actions", label: "Create a budget", icon: WalletCards, to: "/app/budgets?new=1", keywords: "limit" },
   { id: "new-goal", group: "Actions", label: "Create a savings goal", icon: Target, to: "/app/goals?new=1", keywords: "save target" },
   { id: "flagged", group: "Actions", label: "Review unusual spending", icon: ShieldAlert, to: "/app/transactions?flagged=1", keywords: "anomaly outlier flagged" },

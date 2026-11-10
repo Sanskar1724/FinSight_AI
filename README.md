@@ -45,7 +45,7 @@ Most budgeting apps either show raw numbers or give AI advice you cannot check. 
   <tr>
     <td width="50%" valign="top">
       <h3>📒 Ledger that thinks ahead</h3>
-      <p>Search, filter, sort, import CSVs with a preview, and export. Type a merchant and FinSight fills in the category, payment method and account from your history. Link entries to bank, card, wallet and cash accounts to see live balances and your net worth.</p>
+      <p>Search, filter, sort, import bank and credit card statement PDFs (password-protected too) or CSVs with a preview, and export. Statement rows get a merchant and category from the UPI narration, and are checked against the statement's own balances. Type a merchant and FinSight fills in the category, payment method and account from your history. Link entries to bank, card, wallet and cash accounts to see live balances and your net worth.</p>
     </td>
     <td width="50%" valign="top">
       <h3>🎯 Budgets &amp; goals</h3>

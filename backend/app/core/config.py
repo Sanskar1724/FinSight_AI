@@ -51,6 +51,8 @@ class Settings(BaseSettings):
     enable_api_docs: bool | None = None
     notification_check_minutes: int = 30
     max_upload_bytes: int = 2_000_000
+    # Bank statement PDFs are larger than CSV files.
+    max_statement_bytes: int = 10_000_000
     # Public URL of the web app, used in links inside emails.
     public_app_url: str = "http://localhost:5173"
     # Contact shown on the Privacy Policy and Terms pages for data requests.

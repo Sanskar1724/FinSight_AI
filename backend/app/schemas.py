@@ -171,6 +171,73 @@ class CSVImportResponse(BaseModel):
     errors: list[str]
 
 
+# ---------- Statement PDF import ----------
+class StatementBalanceCheck(BaseModel):
+    status: Literal["verified", "mismatch", "unchecked"]
+    rows_checked: int
+    mismatches: int
+    detail: str
+
+
+class StatementPreviewRow(BaseModel):
+    row_number: int
+    occurred_on: date
+    description: str
+    merchant: str
+    type: TransactionType
+    amount: Money
+    balance: Money | None
+    category_id: int
+    # history (your past choice for this merchant) | rule (keyword) | default
+    category_source: str
+    payment_method: str
+    is_transfer: bool
+    duplicate: bool
+    include: bool
+    # How income or expense was decided: column | balance | marker | narration
+    direction_source: str
+    note: str | None = None
+
+
+class StatementPreviewResponse(BaseModel):
+    statement_type: Literal["bank", "credit_card"]
+    bank: str | None
+    account_last4: str | None
+    suggested_account_id: int | None
+    period_start: date | None
+    period_end: date | None
+    opening_balance: Money | None
+    closing_balance: Money | None
+    total_debits: Money
+    total_credits: Money
+    pages: int
+    balance_check: StatementBalanceCheck
+    rows: list[StatementPreviewRow]
+    warnings: list[str] = []
+
+
+class StatementImportRow(BaseModel):
+    occurred_on: date
+    type: TransactionType
+    amount: Decimal = Field(gt=0, le=Decimal("999999999999.99"), decimal_places=2)
+    merchant: str = Field(min_length=1, max_length=160)
+    category_id: int
+    payment_method: str = Field(default="Other", max_length=40)
+    description: str | None = Field(default=None, max_length=1000)
+
+
+class StatementImportRequest(BaseModel):
+    account_id: int | None = None
+    rows: list[StatementImportRow] = Field(min_length=1, max_length=3000)
+
+
+class StatementImportResponse(BaseModel):
+    imported: int
+    skipped_duplicates: int
+    failed: int
+    errors: list[str]
+
+
 # ---------- Accounts ----------
 AccountKind = Literal["bank", "credit_card", "wallet", "cash", "loan"]
 LIABILITY_KINDS = {"credit_card", "loan"}

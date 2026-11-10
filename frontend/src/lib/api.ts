@@ -14,6 +14,14 @@ export class ApiError extends Error {
   }
 }
 
+/** The machine-readable code an error carries, such as "password_required". */
+export function errorCode(error: unknown): string | null {
+  if (!(error instanceof ApiError)) return null;
+  const details = error.details as { detail?: { code?: unknown } } | undefined;
+  const code = details?.detail?.code;
+  return typeof code === "string" ? code : null;
+}
+
 export function buildQuery(params?: Record<string, QueryValue>) {
   if (!params) return "";
   const search = new URLSearchParams();
@@ -57,6 +65,8 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
         const detail = (details as { detail: unknown }).detail;
         if (typeof detail === "string") {
           message = detail;
+        } else if (detail && typeof detail === "object" && "message" in detail) {
+          message = String((detail as { message: unknown }).message);
         } else if (Array.isArray(detail)) {
           message = detail
             .map((item) => {
