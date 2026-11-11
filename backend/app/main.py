@@ -28,6 +28,7 @@ from app.api.routes import (
     notifications,
     research,
     scenarios,
+    statements,
     transactions,
 )
 from app.core.config import BACKEND_DIR, settings
@@ -170,6 +171,7 @@ for router in [
     categories.router,
     transactions.router,
     accounts.router,
+    statements.router,
     budgets.router,
     goals.router,
     dashboard.router,

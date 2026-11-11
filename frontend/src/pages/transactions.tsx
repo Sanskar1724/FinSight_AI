@@ -5,6 +5,7 @@ import {
   ChevronLeft,
   ChevronRight,
   FileSpreadsheet,
+  FileText,
   Pencil,
   Plus,
   ReceiptText,
@@ -21,6 +22,7 @@ import { toast } from "sonner";
 import { CategoryIcon } from "@/components/category-icon";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { CsvImportDialog } from "@/components/csv-import-dialog";
+import { StatementImportDialog } from "@/components/statement-import-dialog";
 import { TransactionDialog } from "@/components/transaction-dialog";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -55,6 +57,7 @@ export default function TransactionsPage() {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [csvOpen, setCsvOpen] = useState(false);
+  const [statementOpen, setStatementOpen] = useState(false);
   const [editing, setEditing] = useState<Transaction | null>(null);
   const [deleting, setDeleting] = useState<Transaction | null>(null);
   const [exporting, setExporting] = useState(false);
@@ -66,6 +69,11 @@ export default function TransactionsPage() {
       setEditing(null);
       setDialogOpen(true);
       next.delete("new");
+      changed = true;
+    }
+    if (next.get("statement") === "1") {
+      setStatementOpen(true);
+      next.delete("statement");
       changed = true;
     }
     if (next.get("import") === "1") {
@@ -212,9 +220,13 @@ export default function TransactionsPage() {
         description="Every income and expense in one auditable place. Filter, edit, import, or export your records."
         actions={
           <>
+            <Button variant="outline" size="sm" onClick={() => setStatementOpen(true)}>
+              <FileText className="size-3.5" />
+              Statement PDF
+            </Button>
             <Button variant="outline" size="sm" onClick={() => setCsvOpen(true)}>
               <Upload className="size-3.5" />
-              Import
+              CSV
             </Button>
             <Button variant="outline" size="sm" onClick={exportData} disabled={exporting}>
               {exporting ? <Spin /> : <ArrowDownToLine className="size-3.5" />}
@@ -647,6 +659,7 @@ export default function TransactionsPage() {
         transaction={editing}
       />
       <CsvImportDialog open={csvOpen} onOpenChange={setCsvOpen} />
+      <StatementImportDialog open={statementOpen} onOpenChange={setStatementOpen} />
       <ConfirmDialog
         open={Boolean(deleting)}
         onOpenChange={(open) => !open && setDeleting(null)}

@@ -58,6 +58,8 @@ HttpOnly, SameSite=Lax, and Secure when `COOKIE_SECURE=true` or
 | GET | `/transactions/export` | Export the filtered ledger as CSV. |
 | POST | `/transactions/import/preview` | Validate and preview a CSV upload. |
 | POST | `/transactions/import` | Commit a validated CSV import. |
+| POST | `/statements/preview` | Read a bank, credit card or UPI app (PhonePe, Google Pay, Paytm, Navi and others) statement PDF (multipart `file`, optional `password`) and return suggested rows, a balance check, and a suggested account. The PDF is not stored. `statement_type` is `bank`, `credit_card` or `upi_app`. Rows that match a ledger entry (same direction and amount within a day) come back with `duplicate: true` and `include: false`. Errors carry a `code` such as `password_required`, `password_incorrect`, `no_text` or `not_pdf`. |
+| POST | `/statements/import` | Import the reviewed rows (`rows`, optional `account_id`). Duplicates are skipped. |
 
 List and export filters include `start`, `end`, `type`, `category_id`, `search`, `flagged`, `sort`, `page`, and `page_size`. `flagged=1` returns every current unusual-spending indicator; `flagged=<id>` returns that single transaction (used by notification links). Sort values use `<field>_<direction>`, for example `date_desc` or `amount_asc`.
 

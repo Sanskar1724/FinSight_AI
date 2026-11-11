@@ -609,3 +609,52 @@ export interface AccountTransfer {
   occurred_on: string;
   note: string | null;
 }
+
+export interface StatementBalanceCheck {
+  status: "verified" | "mismatch" | "unchecked";
+  rows_checked: number;
+  mismatches: number;
+  detail: string;
+}
+
+export interface StatementPreviewRow {
+  row_number: number;
+  occurred_on: string;
+  description: string;
+  merchant: string;
+  type: TransactionType;
+  amount: number;
+  balance: number | null;
+  category_id: number;
+  category_source: "history" | "rule" | "default";
+  payment_method: string;
+  is_transfer: boolean;
+  duplicate: boolean;
+  include: boolean;
+  direction_source: "column" | "balance" | "marker" | "narration";
+  note: string | null;
+}
+
+export interface StatementPreview {
+  statement_type: "bank" | "credit_card" | "upi_app";
+  bank: string | null;
+  account_last4: string | null;
+  suggested_account_id: number | null;
+  period_start: string | null;
+  period_end: string | null;
+  opening_balance: number | null;
+  closing_balance: number | null;
+  total_debits: number;
+  total_credits: number;
+  pages: number;
+  balance_check: StatementBalanceCheck;
+  rows: StatementPreviewRow[];
+  warnings: string[];
+}
+
+export interface StatementImportResult {
+  imported: number;
+  skipped_duplicates: number;
+  failed: number;
+  errors: string[];
+}
